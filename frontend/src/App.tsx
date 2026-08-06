@@ -9,13 +9,16 @@ type DeployState = { kind: 'idle' } | { kind: 'saving' } | { kind: 'deploying' }
 
 export default function App() {
   const [topology, setTopologyState] = useState<Topology | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('simple');
   const [statuses, setStatuses] = useState<Map<string, NodeStatus>>(new Map());
   const [selection, setSelection] = useState<{ nodeId?: string; edgeId?: string }>({});
   const [deployState, setDeployState] = useState<DeployState>({ kind: 'idle' });
 
   useEffect(() => {
-    fetchTopology().then(setTopologyState);
+    fetchTopology()
+      .then(setTopologyState)
+      .catch((err: Error) => setLoadError(err.message));
   }, []);
 
   useEffect(() => {
@@ -25,6 +28,17 @@ export default function App() {
 
   const issues: ValidationIssue[] = useMemo(() => (topology ? validateTopology(topology) : []), [topology]);
   const hasErrors = issues.some((i) => i.severity === 'error');
+
+  if (loadError) {
+    return (
+      <div style={{ padding: 24 }}>
+        <h3>Topologie konnte nicht geladen werden</h3>
+        <p style={{ color: '#b91c1c', fontSize: 13 }}>{loadError}</p>
+        <p style={{ fontSize: 13, color: '#6b7280' }}>Läuft das Backend? (<code>docker compose ps</code>)</p>
+        <button onClick={() => location.reload()}>Erneut versuchen</button>
+      </div>
+    );
+  }
 
   if (!topology) return <div style={{ padding: 24 }}>Lädt…</div>;
 

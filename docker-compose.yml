@@ -3,19 +3,22 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+    restart: unless-stopped
     environment:
       PORT: "4000"
       DATA_DIR: /data
       CONFIG_OUT_DIR: /shared-config
       AMI_HOST: asterisk
       AMI_PORT: "5038"
-      AMI_USERNAME: visualpbx
-      AMI_SECRET: visualpbx
+      AMI_USERNAME: ${AMI_USERNAME:-visualpbx}
+      AMI_SECRET: ${AMI_SECRET:-visualpbx}
     volumes:
       - pbx-data:/data
       - asterisk-generated:/shared-config
     ports:
-      - "4000:4000"
+      # Bound to loopback: the frontend reaches the API through nginx on the
+      # compose network, so there is no reason to expose it to the LAN.
+      - "127.0.0.1:4000:4000"
     depends_on:
       - asterisk
 
@@ -23,6 +26,7 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+    restart: unless-stopped
     ports:
       - "8080:80"
     depends_on:
@@ -31,12 +35,19 @@ services:
   asterisk:
     build:
       context: ./asterisk
+    restart: unless-stopped
+    environment:
+      AMI_USERNAME: ${AMI_USERNAME:-visualpbx}
+      AMI_SECRET: ${AMI_SECRET:-visualpbx}
     volumes:
       - asterisk-generated:/etc/asterisk/generated
     ports:
+      # SIP/RTP stay open so softphones on the LAN can register.
       - "5060:5060/udp"
-      - "5038:5038"
       - "10000-10100:10000-10100/udp"
+      # AMI is a full remote-control interface. The backend talks to it over the
+      # compose network, so it is published on loopback only, for debugging.
+      - "127.0.0.1:5038:5038"
 
 volumes:
   pbx-data:

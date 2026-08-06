@@ -1,7 +1,23 @@
 import { NodeStatus, Topology, ValidationIssue } from '@visual-pbx/shared';
 
+/**
+ * fetch() only rejects on network failures, and an error page is not always
+ * JSON — so surface both as a readable Error instead of a parse crash.
+ * 400 responses are expected (validation) and are handed back to the caller.
+ */
 async function json<T>(res: Response): Promise<T> {
-  return res.json() as Promise<T>;
+  const body = await res.text();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    throw new Error(`Unerwartete Antwort vom Backend (HTTP ${res.status}): ${body.slice(0, 200)}`);
+  }
+  if (!res.ok && res.status !== 400) {
+    const message = (parsed as { error?: string })?.error ?? `HTTP ${res.status}`;
+    throw new Error(message);
+  }
+  return parsed as T;
 }
 
 export function fetchTopology(): Promise<Topology> {

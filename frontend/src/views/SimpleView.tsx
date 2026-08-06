@@ -6,6 +6,7 @@ import ReactFlow, {
   MiniMap,
   Node as RFNode,
   Edge as RFEdge,
+  EdgeChange,
   NodeChange,
   useNodesState,
 } from 'reactflow';
@@ -69,19 +70,45 @@ export function SimpleView({ topology, setTopology, statuses, issues, selectedNo
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
       onNodesChangeInternal(changes);
+
       const moved = changes.filter(
         (c): c is Extract<NodeChange, { type: 'position' }> => c.type === 'position' && !!c.position
       );
-      if (moved.length === 0) return;
-      setTopology((t) => ({
-        ...t,
-        nodes: t.nodes.map((n) => {
-          const change = moved.find((c) => c.id === n.id);
-          return change?.position ? { ...n, position: change.position } : n;
-        }),
-      }));
+      // React Flow removes nodes itself on the delete key. Without mirroring that
+      // into the topology, the sync effect above would immediately put the node
+      // back, so deletions appeared to do nothing.
+      const removedIds = new Set(changes.filter((c) => c.type === 'remove').map((c) => c.id));
+
+      if (moved.length === 0 && removedIds.size === 0) return;
+
+      setTopology((t) => {
+        const nodes = t.nodes
+          .filter((n) => !removedIds.has(n.id))
+          .map((n) => {
+            const change = moved.find((c) => c.id === n.id);
+            return change?.position ? { ...n, position: change.position } : n;
+          });
+
+        if (removedIds.size === 0) return { ...t, nodes };
+
+        return {
+          ...t,
+          nodes,
+          edges: t.edges.filter((e) => !removedIds.has(e.source) && !removedIds.has(e.target)),
+          memberships: t.memberships.filter((m) => !removedIds.has(m.groupId) && !removedIds.has(m.memberId)),
+        };
+      });
     },
     [onNodesChangeInternal, setTopology]
+  );
+
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      const removedIds = new Set(changes.filter((c) => c.type === 'remove').map((c) => c.id));
+      if (removedIds.size === 0) return;
+      setTopology((t) => ({ ...t, edges: t.edges.filter((e) => !removedIds.has(e.id)) }));
+    },
+    [setTopology]
   );
 
   const rfEdges: RFEdge[] = topology.edges.map((e) => ({
@@ -156,6 +183,7 @@ export function SimpleView({ topology, setTopology, statuses, issues, selectedNo
           edges={rfEdges}
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeClick={(_, n) => onSelect({ nodeId: n.id })}
           onEdgeClick={(_, e) => onSelect({ edgeId: e.id })}

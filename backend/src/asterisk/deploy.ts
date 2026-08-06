@@ -11,13 +11,37 @@ const AMI_USERNAME = process.env.AMI_USERNAME ?? 'visualpbx';
 const AMI_SECRET = process.env.AMI_SECRET ?? 'visualpbx';
 
 let cachedClient: AmiClient | null = null;
+let connecting: Promise<AmiClient> | null = null;
 
+/**
+ * Returns a logged-in AMI client, reusing the existing connection.
+ *
+ * The status poller and a deploy can ask for a client at the same time, so
+ * in-flight connects are shared instead of opening a second socket, and a
+ * client that reports a closed socket is dropped from the cache.
+ */
 export async function getAmiClient(): Promise<AmiClient> {
   if (cachedClient?.connected) return cachedClient;
-  const client = new AmiClient(AMI_HOST, AMI_PORT, AMI_USERNAME, AMI_SECRET);
-  await client.connect();
-  cachedClient = client;
-  return client;
+  if (connecting) return connecting;
+
+  connecting = (async () => {
+    const client = new AmiClient(AMI_HOST, AMI_PORT, AMI_USERNAME, AMI_SECRET);
+    client.once('closed', () => {
+      if (cachedClient === client) cachedClient = null;
+    });
+    try {
+      await client.connect();
+      cachedClient = client;
+      return client;
+    } catch (err) {
+      client.disconnect();
+      throw err;
+    } finally {
+      connecting = null;
+    }
+  })();
+
+  return connecting;
 }
 
 export function writeGeneratedConfigs(topology: Topology): void {

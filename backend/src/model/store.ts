@@ -46,7 +46,9 @@ const SEED_TOPOLOGY: Topology = {
       type: 'ivr',
       label: 'Willkommens-IVR',
       position: { x: 200, y: 100 },
-      properties: { greeting: 'welcome', timeout: 5, invalidRetries: 2 },
+      // Prompt names are resolved by Asterisk under /usr/share/asterisk/sounds/;
+      // "hello-world" ships with the core sounds package, "welcome" does not.
+      properties: { greeting: 'hello-world', timeout: 5, invalidRetries: 2 },
     },
   ],
   edges: [

@@ -161,6 +161,13 @@ export interface NodeStatus {
 
 export const DISABLED_NODE_TYPES: ReadonlySet<NodeType> = new Set(['trunk', 'external']);
 
+/**
+ * First generated test entry point. Every node gets one (`600`, `601`, …) so a
+ * callflow can be reached from a softphone without an inbound trunk, which the
+ * PoC does not implement.
+ */
+export const ENTRYPOINT_BASE = 600;
+
 export const NODE_TYPE_LABELS: Record<NodeType, string> = {
   extension: 'Extension',
   ivr: 'IVR',

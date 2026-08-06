@@ -50,11 +50,17 @@ export class AmiClient extends EventEmitter {
       });
       socket.on('error', (err) => {
         clearTimeout(connectTimer);
+        this.failAllPending(err);
         this.connected = false;
+        this.emit('closed');
         reject(err);
       });
       socket.on('close', () => {
+        // Anything still waiting for a reply will never get one; rejecting here
+        // stops those promises (and their timers) from lingering after a drop.
+        this.failAllPending(new Error('AMI connection closed'));
         this.connected = false;
+        this.emit('closed');
       });
 
       this.login()
@@ -69,8 +75,18 @@ export class AmiClient extends EventEmitter {
     });
   }
 
+  private failAllPending(err: Error): void {
+    for (const [, p] of this.pending) {
+      clearTimeout(p.timer);
+      p.reject(err);
+    }
+    this.pending.clear();
+  }
+
   disconnect(): void {
-    this.socket?.end();
+    this.failAllPending(new Error('AMI client disconnected'));
+    this.socket?.removeAllListeners();
+    this.socket?.destroy();
     this.socket = null;
     this.connected = false;
   }

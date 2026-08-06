@@ -27,7 +27,9 @@ export function createDefaultNode(type: Exclude<NodeType, 'trunk' | 'external'>,
         type: 'ivr',
         label: 'Neues IVR',
         position,
-        properties: { greeting: 'welcome', timeout: 5, invalidRetries: 2 },
+        // Must name a prompt Asterisk can resolve; "hello-world" ships with the
+        // core sounds package.
+        properties: { greeting: 'hello-world', timeout: 5, invalidRetries: 2 },
       };
     case 'ringgroup':
       return {
