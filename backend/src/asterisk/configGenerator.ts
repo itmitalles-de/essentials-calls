@@ -33,6 +33,19 @@ function nodeId(id: string): string {
   return `node_${sanitize(id)}`;
 }
 
+/**
+ * PJSIP object name for an extension — derived from the SIP user, not the node id.
+ *
+ * Asterisk identifies an incoming request by matching the SIP username against
+ * the *endpoint name* (`identify_by` defaults to `username,ip`). Naming
+ * endpoints after the node id made every registration fail with "No matching
+ * endpoint found", because the phone authenticates as e.g. `101` while the
+ * endpoint was called `ext_101`.
+ */
+export function endpointName(ext: ExtensionNode): string {
+  return sanitize(ext.properties.sipUser);
+}
+
 function ctxId(id: string): string {
   return `ivr_${sanitize(id)}`;
 }
@@ -65,9 +78,14 @@ export function generatePjsipConf(topology: Topology): string {
   const lines: string[] = [HEADER, ''];
 
   for (const ext of extensionNodes(topology)) {
-    const id = sanitize(ext.id);
+    const id = endpointName(ext);
     const { number, sipUser, sipPassword, callerIdName } = ext.properties;
-    lines.push(`[${id}]`, 'type=aor', 'max_contacts=1', '');
+    // remove_existing: with max_contacts=1 and no replacement policy, a phone
+    // that re-registers from a new source port (restart, network change) is
+    // rejected with "will exceed max contacts" until the old contact expires.
+    // qualify_frequency makes Asterisk probe the contact, so the status panel
+    // reflects a device that vanished instead of showing it online forever.
+    lines.push(`[${id}]`, 'type=aor', 'max_contacts=1', 'remove_existing=yes', 'qualify_frequency=30', '');
     lines.push(`[${id}]`, 'type=auth', 'auth_type=userpass', `username=${sipUser}`, `password=${sipPassword}`, '');
     lines.push(
       `[${id}]`,
@@ -132,7 +150,7 @@ export function generateQueuesConf(topology: Topology): string {
       `leavewhenempty=${queue.properties.leaveWhenEmpty}`
     );
     for (const { ext } of membersOf(topology, queue.id)) {
-      lines.push(`member => PJSIP/${sanitize(ext.id)},0,${ext.label}`);
+      lines.push(`member => PJSIP/${endpointName(ext)},0,${ext.label}`);
     }
     lines.push('');
   }
@@ -207,7 +225,7 @@ function generateCallflowEntry(topology: Topology, node: PbxNode): string[] {
     case 'extension': {
       const ext = node as ExtensionNode;
       lines.push(`exten => ${nodeId(node.id)},1,NoOp(Route to extension ${ext.label})`);
-      lines.push(` same => n,Dial(PJSIP/${sanitize(ext.id)},20)`);
+      lines.push(` same => n,Dial(PJSIP/${endpointName(ext)},20)`);
       finish(ext.properties.voicemail?.enabled ? ext.properties.voicemail.mailbox : undefined);
       break;
     }
@@ -250,7 +268,7 @@ function generateCallflowEntry(topology: Topology, node: PbxNode): string[] {
  * timeout. Without this the strategy field would have no effect whatsoever.
  */
 function ringGroupDialLines(topology: Topology, rg: RingGroupNode): string[] {
-  const members = membersOf(topology, rg.id).map(({ ext }) => `PJSIP/${sanitize(ext.id)}`);
+  const members = membersOf(topology, rg.id).map(({ ext }) => `PJSIP/${endpointName(ext)}`);
   const timeout = rg.properties.ringTimeout;
 
   if (members.length === 0) {
@@ -276,7 +294,7 @@ export function generateExtensionsConf(topology: Topology): string {
   for (const ext of extensionNodes(topology)) {
     const fallback = findFallbackEdge(outgoing(topology, ext.id));
     lines.push(`exten => ${ext.properties.number},1,NoOp(Calling ${ext.label})`);
-    lines.push(` same => n,Dial(PJSIP/${sanitize(ext.id)},20)`);
+    lines.push(` same => n,Dial(PJSIP/${endpointName(ext)},20)`);
     if (fallback) {
       lines.push(` same => n,Goto(callflow,${nodeId(fallback.target)},1)`);
     } else if (ext.properties.voicemail?.enabled) {

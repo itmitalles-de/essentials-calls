@@ -1,6 +1,6 @@
-import { NodeStatus, Topology } from '@visual-pbx/shared';
+import { ExtensionNode, NodeStatus, Topology } from '@visual-pbx/shared';
 import { getAmiClient } from './deploy';
-import { sanitize } from './configGenerator';
+import { endpointName, sanitize } from './configGenerator';
 
 // Derives the dynamic NodeStatus[] model from live AMI queries. Falls back to
 // "unknown" for every node if Asterisk/AMI is unreachable (e.g. still booting),
@@ -9,7 +9,9 @@ export async function computeStatuses(topology: Topology): Promise<NodeStatus[]>
   const idByEndpoint = new Map<string, string>();
   const idByQueue = new Map<string, string>();
   for (const node of topology.nodes) {
-    if (node.type === 'extension') idByEndpoint.set(sanitize(node.id), node.id);
+    // AMI reports PJSIP objects by their config section name, which is derived
+    // from the SIP user — see endpointName().
+    if (node.type === 'extension') idByEndpoint.set(endpointName(node as ExtensionNode), node.id);
     if (node.type === 'queue') idByQueue.set(sanitize(node.id), node.id);
   }
 

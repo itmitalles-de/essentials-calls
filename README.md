@@ -39,16 +39,64 @@ docker compose up -d --build
 Die Beispiel-Topologie (Alice/Bob + Support-Ringgroup + Willkommens-IVR) wird beim
 ersten Start automatisch angelegt (`backend/src/model/store.ts`).
 
-## Testen mit einem Softphone
+## Testen
 
-Extension `101` (Alice, Passwort `pw-101` bzw. das im Editor gesetzte) in einem
-SIP-Softphone gegen `<host>:5060` registrieren.
+### 1. Registrierung prüfen (ohne Softphone)
 
-Zum Testen des Callflows ohne Trunk/DID (im PoC nicht implementiert) generiert
-das Backend Test-Entry-Points: **eine Nummer pro Node, beginnend bei `600`** in
-Reihenfolge der Node-Liste. `600` springt also in den ersten Node, `601` in den
-zweiten usw. — die Zuordnung steht als Kommentar im `[entrypoints]`-Kontext von
-`extensions_generated.conf`.
+```bash
+python3 scripts/sip-register-test.py 101 alice123
+```
+
+Macht einen echten SIP-REGISTER mit Digest-Auth (rohes UDP, keine
+Abhängigkeiten) und sagt, ob Asterisk die Extension akzeptiert. Damit lässt sich
+trennen, ob ein Problem an der generierten Config oder am Softphone liegt.
+Von einem anderen Rechner aus mit Host-Angabe: `… 101 alice123 192.168.1.50`.
+
+Gegenprobe in Asterisk:
+
+```bash
+docker compose exec asterisk asterisk -rx "pjsip show contacts"
+```
+
+### 2. Mit einem Softphone
+
+Beliebiges SIP-Softphone (Linphone, Zoiper, MicroSIP) gegen `<host>:5060`
+registrieren — Benutzer und Passwort sind das, was im Editor unter *SIP User* /
+*SIP Passwort* steht (Seed: `101` / `alice123`, `102` / `bob123`).
+
+Wichtig: Asterisk identifiziert ein Gerät über den **SIP-User**, nicht über die
+Extension-Nummer. Der Generator benennt die PJSIP-Objekte deshalb nach dem
+SIP-User.
+
+### 3. Callflow anrufen
+
+Es gibt keinen Trunk/DID (im PoC nicht implementiert), deshalb generiert das
+Backend Test-Entry-Points: **eine Nummer pro Node, beginnend bei `600`** in
+Reihenfolge der Node-Liste. `600` springt in den ersten Node, `601` in den
+zweiten usw. Die Zuordnung steht als Kommentar im `[entrypoints]`-Kontext von
+`extensions_generated.conf`:
+
+```bash
+docker compose exec asterisk asterisk -rx "dialplan show entrypoints"
+```
+
+Ohne Softphone lässt sich ein Callflow auch direkt anstoßen:
+
+```bash
+docker compose exec asterisk asterisk -rx "channel originate Local/603@internal application Wait 6"
+docker compose exec asterisk cat /var/log/asterisk/cdr-csv/Master.csv | tail -2
+```
+
+Das CDR zeigt, in welchem Kontext und bei welcher Applikation der Anruf gelandet
+ist — praktisch, weil das Messages-Log nur notice/warning/error enthält, kein
+Verbose.
+
+### 4. Automatisierte Tests
+
+```bash
+npm test        # Validator- und Generator-Tests
+npm run typecheck
+```
 
 ## Entwicklung
 
@@ -87,6 +135,14 @@ im Backend (vor jedem Speichern/Deploy):
 
 Verifiziert gegen den laufenden Asterisk-18-Container:
 
+- **Endpoint-Benennung**: Asterisk ordnet eine eingehende Registrierung über den
+  **Endpoint-Namen** zu (`identify_by` ist per Default `username,ip`). Benennt
+  man Endpoints nach der Node-ID (`ext_101`), scheitert jede Registrierung mit
+  „No matching endpoint found“, weil das Telefon sich als `101` meldet. Die
+  PJSIP-Objekte heißen deshalb wie der SIP-User.
+- **AOR `remove_existing`**: Mit `max_contacts=1` und ohne Ersetzungsregel lehnt
+  Asterisk ein Telefon ab, das sich nach einem Neustart von einem neuen Port
+  meldet („will exceed max contacts“), bis die alte Registrierung abläuft.
 - **Voicemail-Modul**: Ubuntu liefert drei sich gegenseitig ausschließende
   Voicemail-Backends. `app_voicemail_odbc` gewann das Laden und scheiterte an der
   fehlenden Datenbank — Voicemail sah konfiguriert aus, konnte aber nichts

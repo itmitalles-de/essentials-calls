@@ -119,6 +119,7 @@ function validateNodes(topology: Topology): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const seenNodeIds = new Set<string>();
   const numberOwners = new Map<string, string>();
+  const sipUserOwners = new Map<string, string>();
   const mailboxOwners = new Map<string, string>();
 
   for (const node of topology.nodes) {
@@ -187,6 +188,28 @@ function validateNodes(topology: Topology): ValidationIssue[] {
           message: `Extension "${ext.label}" hat kein SIP-Passwort; das Gerät kann sich nicht registrieren.`,
           nodeId: node.id,
         });
+      }
+
+      // The SIP user becomes the PJSIP endpoint name, which is what Asterisk
+      // matches an incoming registration against. Two extensions sharing one
+      // would collapse into a single endpoint.
+      const sipUser = ext.properties.sipUser;
+      if (!sipUser) {
+        issues.push({
+          severity: 'error',
+          code: 'missing-sip-user',
+          message: `Extension "${ext.label}" hat keinen SIP-User; ohne ihn kann sich kein Gerät registrieren.`,
+          nodeId: node.id,
+        });
+      } else if (sipUserOwners.has(sipUser)) {
+        issues.push({
+          severity: 'error',
+          code: 'duplicate-sip-user',
+          message: `SIP-User "${sipUser}" wird von mehreren Extensions verwendet ("${sipUserOwners.get(sipUser)}" und "${ext.label}").`,
+          nodeId: node.id,
+        });
+      } else {
+        sipUserOwners.set(sipUser, ext.label);
       }
 
       const vm = ext.properties.voicemail;

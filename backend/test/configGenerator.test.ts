@@ -34,16 +34,37 @@ function officeTopology(): Topology {
 describe('generatePjsipConf', () => {
   test('emits aor, auth and endpoint per extension', () => {
     const conf = generatePjsipConf(officeTopology());
-    assert.match(conf, /\[ext_101\]\ntype=aor/);
-    assert.match(conf, /\[ext_101\]\ntype=auth\nauth_type=userpass\nusername=101\npassword=pw-101/);
-    assert.match(conf, /\[ext_101\]\ntype=endpoint/);
+    assert.match(conf, /\[101\]\ntype=aor/);
+    assert.match(conf, /\[101\]\ntype=auth\nauth_type=userpass\nusername=101\npassword=pw-101/);
+    assert.match(conf, /\[101\]\ntype=endpoint/);
     assert.match(conf, /callerid="Ext 101" <101>/);
   });
 
-  test('sanitizes ids that are not valid Asterisk section names', () => {
-    const conf = generatePjsipConf(topology({ nodes: [extension('ext with spaces!', '101')] }));
-    assert.match(conf, /\[ext_with_spaces_\]/);
-    assert.ok(!conf.includes('[ext with spaces!]'));
+  test('names endpoints after the SIP user, not the node id', () => {
+    // Asterisk matches an incoming registration against the endpoint *name*
+    // (identify_by defaults to username,ip). Naming endpoints after the node id
+    // made every REGISTER fail with "No matching endpoint found".
+    const t = topology({ nodes: [extension('some-node-id', '101', { sipUser: '101' })] });
+    const conf = generatePjsipConf(t);
+    assert.match(conf, /\[101\]/);
+    assert.ok(!conf.includes('[some_node_id]'), 'must not name the endpoint after the node id');
+  });
+
+  test('cross-references auth and aors by the same endpoint name', () => {
+    const conf = generatePjsipConf(officeTopology());
+    assert.match(conf, /auth=101\naors=101/);
+  });
+
+  test('lets a phone re-register from a new port', () => {
+    // Without remove_existing, max_contacts=1 makes Asterisk reject a restarted
+    // phone with "will exceed max contacts" until the stale contact expires.
+    assert.match(generatePjsipConf(officeTopology()), /max_contacts=1\nremove_existing=yes/);
+  });
+
+  test('sanitizes SIP users that are not valid Asterisk section names', () => {
+    const conf = generatePjsipConf(topology({ nodes: [extension('n1', '101', { sipUser: 'user with spaces!' })] }));
+    assert.match(conf, /\[user_with_spaces_\]/);
+    assert.ok(!conf.includes('[user with spaces!]'));
   });
 });
 
@@ -88,7 +109,7 @@ describe('generateExtensionsConf', () => {
 
   test('dials ring group members in parallel for ringall', () => {
     const conf = generateExtensionsConf(officeTopology());
-    assert.match(conf, /same => n,Dial\(PJSIP\/ext_101&PJSIP\/ext_102,15\)/);
+    assert.match(conf, /same => n,Dial\(PJSIP\/101&PJSIP\/102,15\)/);
   });
 
   test('dials ring group members sequentially for ordered strategies', () => {
@@ -97,7 +118,7 @@ describe('generateExtensionsConf', () => {
     const t = officeTopology();
     (t.nodes[2] as ReturnType<typeof ringGroup>).properties.strategy = 'roundrobin';
     const conf = generateExtensionsConf(t);
-    assert.match(conf, /same => n,Dial\(PJSIP\/ext_101,15\)\n same => n,Dial\(PJSIP\/ext_102,15\)/);
+    assert.match(conf, /same => n,Dial\(PJSIP\/101,15\)\n same => n,Dial\(PJSIP\/102,15\)/);
   });
 
   test('never emits a Dial() with an empty target for an empty group', () => {
@@ -147,7 +168,7 @@ describe('generateQueuesConf', () => {
       ],
     });
     const conf = generateQueuesConf(t);
-    assert.ok(conf.indexOf('PJSIP/ext_b') < conf.indexOf('PJSIP/ext_a'));
+    assert.ok(conf.indexOf('PJSIP/102') < conf.indexOf('PJSIP/101'));
   });
 });
 
