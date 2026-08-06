@@ -1,196 +1,88 @@
 # Visual PBX
 
-PoC: visueller Callflow-Editor für eine PBX, mit generierten Asterisk-Configs und
-Live-Reload über das Asterisk Manager Interface (AMI). Läuft komplett als
-Docker-Compose-Stack (Frontend, Backend, Asterisk).
+Visueller Callflow-Editor für eine Telefonanlage. Der Graph wird in
+Asterisk-Konfiguration übersetzt und per AMI in einen laufenden Asterisk
+geladen. Läuft komplett als Docker-Compose-Stack.
 
-## Architektur
-
-```
-shared/    Domain-Modell (Topology/Node/Edge/Membership) + Validator, TypeScript
-backend/   Express-API: Validierung, Asterisk-Config-Generator, AMI-Client, WebSocket-Status
-frontend/  React + React Flow: einfache Ansicht (Graph-Editor) + erweiterte Ansicht (Tabellen)
-asterisk/  Ubuntu-22.04-Image mit Asterisk 18, statische Base-Configs + generierte Includes
-```
-
-- **Einfache Ansicht**: ComfyUI-artiger Node-Graph-Editor (React Flow). Nodes per Klick
-  hinzufügen, Kanten per Drag zwischen Handles ziehen, Eigenschaften im rechten
-  Panel bearbeiten.
-- **Erweiterte Ansicht**: Rohdaten-/Tabellenansicht für Nodes, Edges, Memberships.
-- **IVR-Ansagen**: direkt im Browser aufnehmen oder eine Datei hochladen. Die
-  Konvertierung nach 8 kHz Mono WAV passiert im Browser (Web Audio API), das
-  Backend braucht daher kein ffmpeg. Die Dateien liegen in einem Volume, das
-  Asterisk als `custom/<name>` sieht.
-- **Dark Mode**: folgt der Systemeinstellung und lässt sich manuell auf Hell /
-  Dunkel / System stellen; die Wahl überlebt einen Reload.
-- **Deploy**: validiert die Topologie, generiert `pjsip_generated.conf`,
-  `extensions_generated.conf`, `queues_generated.conf`, `voicemail_generated.conf`
-  und lädt sie per AMI (`dialplan reload`, `pjsip reload`, `queue reload all`,
-  `voicemail reload`) in den laufenden Asterisk-Container.
-- **Status**: Node-Status (online/offline, idle/ringing/in_call, Queue-Wartende)
-  wird per WebSocket alle 3s aus `PJSIPShowEndpoints`/`QueueStatus` gepusht.
+Proof of Concept — funktionsfähig und gegen einen laufenden Asterisk 18
+verifiziert, aber ohne Authentifizierung und ohne Trunk-Anbindung.
+Einschränkungen: [docs/roadmap.md](docs/roadmap.md).
 
 ## Starten
 
 ```bash
-cp .env.example .env    # AMI_SECRET anpassen
+cp .env.example .env      # AMI_SECRET ändern
 docker compose up -d --build
 ```
 
-- Frontend: http://localhost:8080
-- Backend-API: http://127.0.0.1:4000
-- Asterisk AMI: 127.0.0.1:5038 (nur lokal veröffentlicht)
-- Asterisk SIP: UDP 5060, RTP 10000-10100 (für Softphones im LAN offen)
+Oberfläche: <http://localhost:8080>
 
-Die Beispiel-Topologie (Alice/Bob + Support-Ringgroup + Willkommens-IVR) wird beim
-ersten Start automatisch angelegt (`backend/src/model/store.ts`).
+Die Beispieltopologie (Alice, Bob, Support-Ringgruppe, Willkommens-IVR) wird
+beim ersten Start angelegt.
 
-## Testen
+## Was es kann
 
-### 1. Registrierung prüfen (ohne Softphone)
+- **Einfache Ansicht** — Node-Graph-Editor: Nodes anlegen, Kanten ziehen,
+  Eigenschaften im Inspector bearbeiten.
+- **Erweiterte Ansicht** — dieselben Daten als Tabellen, plus Fehlerliste.
+- **Live-Validierung** — dieselben Regeln im Browser und im Backend; ein
+  fehlerhafter Callflow lässt sich nicht deployen.
+- **Deploy** — erzeugt `pjsip`-, `extensions`-, `queues`- und
+  `voicemail`-Config und lädt sie per AMI nach.
+- **IVR-Ansagen** — im Browser aufnehmen oder Datei hochladen; die Umwandlung
+  nach 8 kHz Mono WAV passiert im Browser.
+- **Live-Status** — registriert / im Gespräch / Queue-Wartende, per WebSocket.
+- **Dark Mode** — folgt dem System, manuell übersteuerbar, bleibt gespeichert.
+
+## Schnell testen
 
 ```bash
+# Registrierung prüfen, ohne Softphone
 python3 scripts/sip-register-test.py 101 alice123
-```
 
-Macht einen echten SIP-REGISTER mit Digest-Auth (rohes UDP, keine
-Abhängigkeiten) und sagt, ob Asterisk die Extension akzeptiert. Damit lässt sich
-trennen, ob ein Problem an der generierten Config oder am Softphone liegt.
-Von einem anderen Rechner aus mit Host-Angabe: `… 101 alice123 192.168.1.50`.
-
-Gegenprobe in Asterisk:
-
-```bash
-docker compose exec asterisk asterisk -rx "pjsip show contacts"
-```
-
-### 2. Mit einem Softphone
-
-Beliebiges SIP-Softphone (Linphone, Zoiper, MicroSIP) gegen `<host>:5060`
-registrieren — Benutzer und Passwort sind das, was im Editor unter *SIP User* /
-*SIP Passwort* steht (Seed: `101` / `alice123`, `102` / `bob123`).
-
-Wichtig: Asterisk identifiziert ein Gerät über den **SIP-User**, nicht über die
-Extension-Nummer. Der Generator benennt die PJSIP-Objekte deshalb nach dem
-SIP-User.
-
-### 3. Callflow anrufen
-
-Es gibt keinen Trunk/DID (im PoC nicht implementiert), deshalb generiert das
-Backend Test-Entry-Points: **eine Nummer pro Node, beginnend bei `600`** in
-Reihenfolge der Node-Liste. `600` springt in den ersten Node, `601` in den
-zweiten usw. Die Zuordnung steht als Kommentar im `[entrypoints]`-Kontext von
-`extensions_generated.conf`:
-
-```bash
-docker compose exec asterisk asterisk -rx "dialplan show entrypoints"
-```
-
-Ohne Softphone lässt sich ein Callflow auch direkt anstoßen:
-
-```bash
+# Callflow anstoßen, ohne Telefon
 docker compose exec asterisk asterisk -rx "channel originate Local/603@internal application Wait 6"
 docker compose exec asterisk cat /var/log/asterisk/cdr-csv/Master.csv | tail -2
 ```
 
-Das CDR zeigt, in welchem Kontext und bei welcher Applikation der Anruf gelandet
-ist — praktisch, weil das Messages-Log nur notice/warning/error enthält, kein
-Verbose.
-
-### 4. Automatisierte Tests
-
-```bash
-npm test        # Validator- und Generator-Tests
-npm run typecheck
-```
+Mit einem Softphone: gegen `<host>:5060` registrieren, Benutzer `101` /
+Passwort `alice123` (bzw. `102` / `bob123`). Dann `101`, `102` oder die
+Testnummern ab `600` wählen — je eine pro Node, weil es keinen Trunk gibt.
 
 ## Entwicklung
 
 ```bash
 npm install
-npm run typecheck   # shared bauen + backend/frontend typecheck
-npm test            # Validator- und Generator-Tests (node:test)
-npm run build       # Produktions-Bundles
+npm run typecheck
+npm test            # 52 Tests: Validator, Config-Generator, Sound-Validierung
+npm run build
 
-npm run dev:backend    # erwartet Asterisk/AMI auf localhost:5038
-npm run dev:frontend   # Vite Dev-Server auf :5173, proxied /api und /ws auf localhost:4000
+npm run dev:backend    # erwartet AMI auf localhost:5038
+npm run dev:frontend   # Vite auf :5173
 ```
 
-## Validierungsregeln
+## Aufbau
 
-Der Validator (`shared/src/validator.ts`) läuft identisch im Frontend (live) und
-im Backend (vor jedem Speichern/Deploy):
+```
+shared/    Domain-Modell + Validator (von Backend und Frontend genutzt)
+backend/   Express-API, Config-Generator, AMI-Client, Ansagen-Ablage
+frontend/  React + React Flow, ausgeliefert von nginx
+asterisk/  Asterisk 18 auf Ubuntu 22.04, Basis-Configs
+scripts/   sip-register-test.py
+```
 
-- **Struktur**: Die API akzeptiert beliebiges JSON, deshalb wird die Form geprüft,
-  bevor irgendeine Regel auf Felder zugreift.
-- **Kantenübergänge**: nur erlaubte Typkombinationen (`ALLOWED_TRANSITIONS`).
-- **Voicemail** hat keine ausgehenden Kanten; **Trunk/External** sind reserviert
-  und im PoC deaktiviert.
-- **Eindeutigkeit**: Node-/Edge-/Membership-IDs, Extension-Nummern, Mailboxen,
-  IVR-Ziffern.
-- **Eindeutige Fallbacks**: Extension/RingGroup/Queue haben genau einen
-  Nachfolger — mehrere ausgehende Kanten würden beim Generieren still verworfen.
-- **Gruppen brauchen Mitglieder**: eine leere RingGroup/Queue kann keinen Anruf
-  zustellen.
-- **Zyklen**: jeder Zyklus braucht mindestens eine Kante mit `timeout` oder
-  `invalid` als Exit. Die Prüfung zählt echte einfache Zyklen auf (nicht nur
-  einen Repräsentanten pro Back-Edge), damit ein Zyklus ohne Exit sich nicht
-  hinter einem Nachbarzyklus mit Exit verstecken kann.
+## Dokumentation
 
-## Umsetzungsdetails, die beim Bauen wichtig wurden
+| Dokument | Inhalt |
+|---|---|
+| [Architektur](docs/architecture.md) | Komponenten, Datenfluss, Deploy-Pipeline |
+| [Domain-Modell](docs/domain-model.md) | Topologie und alle Validierungsregeln |
+| [Asterisk-Abbildung](docs/asterisk-mapping.md) | Wie aus Nodes Config wird |
+| [API](docs/api.md) | REST und WebSocket |
+| [Betrieb](docs/operations.md) | Konfiguration, Testen, Fehlersuche, Sicherheit |
+| [Fallstricke](docs/asterisk-notes.md) | Was erst im laufenden Asterisk auffiel |
+| [Stand und Offenes](docs/roadmap.md) | Verifiziertes, Grenzen, mögliche Schritte |
 
-Verifiziert gegen den laufenden Asterisk-18-Container:
-
-- **Eigene Ansagen**: Auf Debian/Ubuntu ist `/usr/share/asterisk/sounds/custom`
-  ein Symlink nach `/usr/local/share/asterisk/sounds`. Dateien dort sind als
-  `custom/<name>` abspielbar. Asterisks `format_wav` verlangt 8 oder 16 kHz,
-  16 Bit, Mono — andere Formate nimmt der Upload klaglos an und scheitern erst
-  beim Anruf, deshalb prüft das Backend den RIFF-Header vor dem Speichern.
-- **Endpoint-Benennung**: Asterisk ordnet eine eingehende Registrierung über den
-  **Endpoint-Namen** zu (`identify_by` ist per Default `username,ip`). Benennt
-  man Endpoints nach der Node-ID (`ext_101`), scheitert jede Registrierung mit
-  „No matching endpoint found“, weil das Telefon sich als `101` meldet. Die
-  PJSIP-Objekte heißen deshalb wie der SIP-User.
-- **AOR `remove_existing`**: Mit `max_contacts=1` und ohne Ersetzungsregel lehnt
-  Asterisk ein Telefon ab, das sich nach einem Neustart von einem neuen Port
-  meldet („will exceed max contacts“), bis die alte Registrierung abläuft.
-- **Voicemail-Modul**: Ubuntu liefert drei sich gegenseitig ausschließende
-  Voicemail-Backends. `app_voicemail_odbc` gewann das Laden und scheiterte an der
-  fehlenden Datenbank — Voicemail sah konfiguriert aus, konnte aber nichts
-  speichern. `modules.conf` blockiert daher die ODBC-/IMAP-Varianten.
-- **Entry-Points**: Endpoints registrieren in den Kontext `internal`; die
-  Test-Nummern brauchen deshalb ein `include => entrypoints`, sonst sind sie
-  nicht wählbar.
-- **IVR-Retry**: Asterisk kennt kein `${VAR:-default}` (das ist Substring-Syntax).
-  Der Zähler wird beim Eintritt gesetzt, und ein erneuter Prompt springt auf das
-  Label `(menu)` statt auf Priorität 1 — sonst würde der Zähler bei jeder
-  Fehleingabe zurückgesetzt.
-- **Queue-Strategie**: `roundrobin` wurde in Asterisk 12 entfernt; der Generator
-  übersetzt es nach `rrmemory`, statt es still zu ignorieren.
-- **Queue-Wartezeit**: `timeout` in `queues.conf` ist nur die Klingeldauer pro
-  Agent. Die Gesamtwartezeit ist das 5. Argument der `Queue()`-Applikation.
-- **RingGroup-Strategie**: `Dial()` kann nur parallel klingeln. `ringall` wird
-  parallel umgesetzt, alle geordneten Strategien als sequentielle `Dial()`-Kette
-  in Membership-Reihenfolge (Näherung, siehe Einschränkungen).
-- **Prompt-Dateien**: Namen werden von Asterisk unter
-  `/usr/share/asterisk/sounds/` aufgelöst. `hello-world` existiert, `welcome`
-  nicht — ein nicht vorhandener Prompt fällt erst zur Laufzeit auf.
-- **React Flow**: Nodes dürfen nicht bei jedem Render neu aus dem State
-  aufgebaut werden, sonst verliert React Flow seine Größenmessung und rendert
-  **stillschweigend gar keine Kanten**. Der Editor hält die Node-Liste über
-  `useNodesState` und merged Änderungen hinein.
-
-## Bekannte PoC-Einschränkungen
-
-- Keine Trunk-/DID-Anbindung an echte Telefonie (nur interne Extensions +
-  generierte Test-Entry-Points).
-- RingGroup-Strategien außer `ringall` sind eine sequentielle Näherung; echtes
-  Round-Robin mit Gedächtnis über Anrufe hinweg bräuchte `app_queue`.
-- SIP-Passwörter stehen im Klartext in der Topologie-JSON und werden von der API
-  unverschlüsselt ausgeliefert.
-- Persistenz ist eine einzelne JSON-Datei (`pbx-data`-Volume), ohne Historie,
-  Locking oder Mehrbenutzerbetrieb.
-- AMI-Zugangsdaten haben Default-Werte (`visualpbx`/`visualpbx`); der Container
-  warnt beim Start, wenn das Default-Secret aktiv ist.
-- Der Status-Poller fragt alle 3s per AMI ab; für viele Nodes wäre ein
-  Event-Abo (`Newstate`/`QueueCallerJoin`) sparsamer.
+Wer an der Asterisk-Erzeugung arbeitet, sollte mit
+[docs/asterisk-notes.md](docs/asterisk-notes.md) anfangen: Dort steht, welche
+Konstrukte fehlerfrei laden und trotzdem nicht funktionieren.
