@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { Edge, EdgeCondition, ExtensionNode, IVRNode, PbxNode, QueueNode, RingGroupNode, Topology, VoicemailNode } from '@visual-pbx/shared';
+import { GreetingPicker } from './GreetingPicker';
 
 interface InspectorProps {
   topology: Topology;
@@ -13,7 +14,7 @@ interface InspectorProps {
 }
 
 const field: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 8 };
-const labelStyle: CSSProperties = { fontSize: 11, color: '#6b7280' };
+const labelStyle: CSSProperties = { fontSize: 11, color: 'var(--fg-muted)' };
 
 export function Inspector(props: InspectorProps) {
   const { topology, selectedNodeId, selectedEdgeId } = props;
@@ -23,7 +24,7 @@ export function Inspector(props: InspectorProps) {
   if (node) return <NodeForm key={node.id} node={node} {...props} />;
   if (edge) return <EdgeForm key={edge.id} edge={edge} {...props} />;
   return (
-    <div style={{ padding: 16, color: '#6b7280', fontSize: 13 }}>
+    <div style={{ padding: 16, color: 'var(--fg-muted)', fontSize: 13 }}>
       Node oder Kante auswählen, um Details zu bearbeiten.
     </div>
   );
@@ -51,7 +52,7 @@ function NodeForm({ node, topology, onUpdateNode, onDeleteNode, onToggleMembersh
         <MembershipEditor topology={topology} groupId={node.id} onToggle={onToggleMembership} />
       )}
 
-      <button style={{ marginTop: 12, color: '#b91c1c' }} onClick={() => onDeleteNode(node.id)}>
+      <button style={{ marginTop: 12, color: 'var(--danger)' }} onClick={() => onDeleteNode(node.id)}>
         Node löschen
       </button>
     </div>
@@ -90,7 +91,11 @@ function ExtensionFields({ node, updateProps }: { node: ExtensionNode; updatePro
 function IVRFields({ node, updateProps }: { node: IVRNode; updateProps: (p: Record<string, unknown>) => void }) {
   return (
     <>
-      <TextField label="Begrüßung (Datei)" value={node.properties.greeting} onChange={(v) => updateProps({ greeting: v })} />
+      <GreetingPicker
+        value={node.properties.greeting}
+        onChange={(greeting) => updateProps({ greeting })}
+        suggestedName={node.label || 'ansage'}
+      />
       <NumberField label="Timeout (s)" value={node.properties.timeout} onChange={(v) => updateProps({ timeout: v })} />
       <NumberField label="Max. Fehlversuche" value={node.properties.invalidRetries} onChange={(v) => updateProps({ invalidRetries: v })} />
     </>
@@ -142,9 +147,9 @@ function MembershipEditor({ topology, groupId, onToggle }: { topology: Topology;
   const memberIds = new Set(topology.memberships.filter((m) => m.groupId === groupId).map((m) => m.memberId));
   const extensions = topology.nodes.filter((n) => n.type === 'extension');
   return (
-    <div style={{ marginTop: 8, borderTop: '1px solid #e5e7eb', paddingTop: 8 }}>
+    <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
       <div style={labelStyle}>Mitglieder</div>
-      {extensions.length === 0 && <div style={{ fontSize: 12, color: '#9ca3af' }}>Keine Extensions vorhanden.</div>}
+      {extensions.length === 0 && <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Keine Extensions vorhanden.</div>}
       {extensions.map((ext) => (
         <label key={ext.id} style={{ display: 'block', fontSize: 12 }}>
           <input type="checkbox" checked={memberIds.has(ext.id)} onChange={() => onToggle(groupId, ext.id)} /> {ext.label}
@@ -183,7 +188,7 @@ function EdgeForm({ edge, onUpdateEdge, onDeleteEdge }: InspectorProps & { edge:
           onChange={(v) => setCondition({ type: 'digit', value: v.slice(0, 1) })}
         />
       )}
-      <button style={{ marginTop: 12, color: '#b91c1c' }} onClick={() => onDeleteEdge(edge.id)}>
+      <button style={{ marginTop: 12, color: 'var(--danger)' }} onClick={() => onDeleteEdge(edge.id)}>
         Kante löschen
       </button>
     </div>

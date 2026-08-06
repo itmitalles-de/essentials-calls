@@ -8,6 +8,7 @@ services:
       PORT: "4000"
       DATA_DIR: /data
       CONFIG_OUT_DIR: /shared-config
+      SOUNDS_DIR: /sounds
       AMI_HOST: asterisk
       AMI_PORT: "5038"
       AMI_USERNAME: ${AMI_USERNAME:-visualpbx}
@@ -15,6 +16,10 @@ services:
     volumes:
       - pbx-data:/data
       - asterisk-generated:/shared-config
+      # Shared with Asterisk, which reaches it via the
+      # /usr/share/asterisk/sounds/custom symlink, so uploads are playable as
+      # "custom/<name>" without restarting anything.
+      - asterisk-sounds:/sounds
     ports:
       # Bound to loopback: the frontend reaches the API through nginx on the
       # compose network, so there is no reason to expose it to the LAN.
@@ -41,6 +46,7 @@ services:
       AMI_SECRET: ${AMI_SECRET:-visualpbx}
     volumes:
       - asterisk-generated:/etc/asterisk/generated
+      - asterisk-sounds:/usr/local/share/asterisk/sounds
     ports:
       # SIP/RTP stay open so softphones on the LAN can register.
       - "5060:5060/udp"
@@ -52,3 +58,4 @@ services:
 volumes:
   pbx-data:
   asterisk-generated:
+  asterisk-sounds:

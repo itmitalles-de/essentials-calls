@@ -17,6 +17,12 @@ asterisk/  Ubuntu-22.04-Image mit Asterisk 18, statische Base-Configs + generier
   hinzufügen, Kanten per Drag zwischen Handles ziehen, Eigenschaften im rechten
   Panel bearbeiten.
 - **Erweiterte Ansicht**: Rohdaten-/Tabellenansicht für Nodes, Edges, Memberships.
+- **IVR-Ansagen**: direkt im Browser aufnehmen oder eine Datei hochladen. Die
+  Konvertierung nach 8 kHz Mono WAV passiert im Browser (Web Audio API), das
+  Backend braucht daher kein ffmpeg. Die Dateien liegen in einem Volume, das
+  Asterisk als `custom/<name>` sieht.
+- **Dark Mode**: folgt der Systemeinstellung und lässt sich manuell auf Hell /
+  Dunkel / System stellen; die Wahl überlebt einen Reload.
 - **Deploy**: validiert die Topologie, generiert `pjsip_generated.conf`,
   `extensions_generated.conf`, `queues_generated.conf`, `voicemail_generated.conf`
   und lädt sie per AMI (`dialplan reload`, `pjsip reload`, `queue reload all`,
@@ -135,6 +141,11 @@ im Backend (vor jedem Speichern/Deploy):
 
 Verifiziert gegen den laufenden Asterisk-18-Container:
 
+- **Eigene Ansagen**: Auf Debian/Ubuntu ist `/usr/share/asterisk/sounds/custom`
+  ein Symlink nach `/usr/local/share/asterisk/sounds`. Dateien dort sind als
+  `custom/<name>` abspielbar. Asterisks `format_wav` verlangt 8 oder 16 kHz,
+  16 Bit, Mono — andere Formate nimmt der Upload klaglos an und scheitern erst
+  beim Anruf, deshalb prüft das Backend den RIFF-Header vor dem Speichern.
 - **Endpoint-Benennung**: Asterisk ordnet eine eingehende Registrierung über den
   **Endpoint-Namen** zu (`identify_by` ist per Default `username,ip`). Benennt
   man Endpoints nach der Node-ID (`ext_101`), scheitert jede Registrierung mit

@@ -8,8 +8,8 @@ interface AdvancedViewProps {
   issues: ValidationIssue[];
 }
 
-const th: CSSProperties = { textAlign: 'left', fontSize: 11, color: '#6b7280', padding: '4px 8px', borderBottom: '1px solid #e5e7eb' };
-const td: CSSProperties = { padding: '4px 8px', borderBottom: '1px solid #f3f4f6', fontSize: 12 };
+const th: CSSProperties = { textAlign: 'left', fontSize: 11, color: 'var(--fg-muted)', padding: '4px 8px', borderBottom: '1px solid var(--border)' };
+const td: CSSProperties = { padding: '4px 8px', borderBottom: '1px solid var(--border)', fontSize: 12 };
 
 export function AdvancedView({ topology, setTopology, issues }: AdvancedViewProps) {
   const updateNode = (id: string, patch: Partial<PbxNode>) =>
@@ -50,10 +50,10 @@ export function AdvancedView({ topology, setTopology, issues }: AdvancedViewProp
   return (
     <div style={{ padding: 16, overflowY: 'auto', height: '100%' }}>
       {issues.length > 0 && (
-        <div style={{ marginBottom: 16, border: '1px solid #fecaca', background: '#fef2f2', borderRadius: 6, padding: 8 }}>
+        <div style={{ marginBottom: 16, border: '1px solid var(--danger-border)', background: 'var(--danger-bg)', borderRadius: 6, padding: 8 }}>
           <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Validierung ({issues.length})</div>
           {issues.map((i, idx) => (
-            <div key={idx} style={{ fontSize: 12, color: i.severity === 'error' ? '#b91c1c' : '#92400e' }}>
+            <div key={idx} style={{ fontSize: 12, color: i.severity === 'error' ? 'var(--danger)' : 'var(--warning)' }}>
               [{i.severity}] {i.code}: {i.message}
             </div>
           ))}
@@ -103,7 +103,7 @@ export function AdvancedView({ topology, setTopology, issues }: AdvancedViewProp
           ))}
         </tbody>
       </table>
-      <p style={{ fontSize: 12, color: '#6b7280' }}>
+      <p style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
         Neue Nodes und typ-spezifische Eigenschaften (Nummer, Strategie, ...) über die einfache Ansicht anlegen/bearbeiten.
       </p>
 

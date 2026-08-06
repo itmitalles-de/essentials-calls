@@ -26,6 +26,14 @@ interface SimpleViewProps {
   onSelect: (sel: { nodeId?: string; edgeId?: string }) => void;
 }
 
+const NODE_MINIMAP_COLORS: Record<string, string> = {
+  extension: 'var(--node-extension)',
+  ivr: 'var(--node-ivr)',
+  ringgroup: 'var(--node-ringgroup)',
+  queue: 'var(--node-queue)',
+  voicemail: 'var(--node-voicemail)',
+};
+
 const PALETTE: { type: Exclude<NodeType, 'trunk' | 'external'>; label: string }[] = [
   { type: 'extension', label: '+ Extension' },
   { type: 'ivr', label: '+ IVR' },
@@ -118,7 +126,7 @@ export function SimpleView({ topology, setTopology, statuses, issues, selectedNo
     label: conditionLabel(e),
     animated: e.condition?.type === 'unconditional' || !e.condition,
     selected: e.id === selectedEdgeId,
-    style: invalidEdgeIds.has(e.id) ? { stroke: '#ef4444' } : undefined,
+    style: invalidEdgeIds.has(e.id) ? { stroke: 'var(--danger)' } : undefined,
   }));
 
   const onConnect = useCallback(
@@ -190,12 +198,17 @@ export function SimpleView({ topology, setTopology, statuses, issues, selectedNo
           onPaneClick={() => onSelect({})}
           fitView
         >
-          <Background />
+          {/* These take colours as props, not CSS, so they are read from the
+              resolved theme tokens rather than styled in the stylesheet. */}
+          <Background color="var(--grid-dot)" />
           <Controls />
-          <MiniMap />
+          <MiniMap
+            nodeColor={(n) => NODE_MINIMAP_COLORS[(n.data as PbxNodeData)?.pbxNode?.type] ?? 'var(--fg-muted)'}
+            maskColor="transparent"
+          />
         </ReactFlow>
       </div>
-      <div style={{ width: 280, borderLeft: '1px solid #e5e7eb', overflowY: 'auto' }}>
+      <div style={{ width: 280, borderLeft: '1px solid var(--border)', overflowY: 'auto' }}>
         <Inspector
           topology={topology}
           selectedNodeId={selectedNodeId}

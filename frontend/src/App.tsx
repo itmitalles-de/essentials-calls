@@ -3,6 +3,7 @@ import { NodeStatus, Topology, ValidationIssue, validateTopology } from '@visual
 import { connectStatusSocket, deployTopology, fetchTopology, saveTopology } from './api/client';
 import { SimpleView } from './views/SimpleView';
 import { AdvancedView } from './views/AdvancedView';
+import { THEME_ICONS, THEME_LABELS, useTheme } from './theme';
 
 type Tab = 'simple' | 'advanced';
 type DeployState = { kind: 'idle' } | { kind: 'saving' } | { kind: 'deploying' } | { kind: 'ok'; message: string } | { kind: 'error'; message: string };
@@ -14,6 +15,7 @@ export default function App() {
   const [statuses, setStatuses] = useState<Map<string, NodeStatus>>(new Map());
   const [selection, setSelection] = useState<{ nodeId?: string; edgeId?: string }>({});
   const [deployState, setDeployState] = useState<DeployState>({ kind: 'idle' });
+  const theme = useTheme();
 
   useEffect(() => {
     fetchTopology()
@@ -33,8 +35,8 @@ export default function App() {
     return (
       <div style={{ padding: 24 }}>
         <h3>Topologie konnte nicht geladen werden</h3>
-        <p style={{ color: '#b91c1c', fontSize: 13 }}>{loadError}</p>
-        <p style={{ fontSize: 13, color: '#6b7280' }}>Läuft das Backend? (<code>docker compose ps</code>)</p>
+        <p style={{ color: 'var(--danger)', fontSize: 13 }}>{loadError}</p>
+        <p style={{ fontSize: 13, color: 'var(--fg-muted)' }}>Läuft das Backend? (<code>docker compose ps</code>)</p>
         <button onClick={() => location.reload()}>Erneut versuchen</button>
       </div>
     );
@@ -64,7 +66,7 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <header style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', borderBottom: '1px solid #e5e7eb' }}>
+      <header style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', borderBottom: '1px solid var(--border)' }}>
         <strong>Visual PBX</strong>
         <nav style={{ display: 'flex', gap: 4 }}>
           <button onClick={() => setTab('simple')} disabled={tab === 'simple'}>
@@ -75,15 +77,24 @@ export default function App() {
           </button>
         </nav>
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 12, color: hasErrors ? '#b91c1c' : '#16a34a' }}>
+        <span style={{ fontSize: 12, color: hasErrors ? 'var(--danger)' : 'var(--success)' }}>
           {hasErrors ? `${issues.filter((i) => i.severity === 'error').length} Validierungsfehler` : 'Topologie gültig'}
         </span>
+        <button
+          onClick={theme.cycle}
+          title={`Design: ${THEME_LABELS[theme.preference]}${
+            theme.preference === 'system' ? ` (aktuell ${THEME_LABELS[theme.resolved]})` : ''
+          } — klicken zum Umschalten`}
+          aria-label={`Design umschalten, aktuell ${THEME_LABELS[theme.preference]}`}
+        >
+          {THEME_ICONS[theme.preference]} {THEME_LABELS[theme.preference]}
+        </button>
         <button onClick={handleSave}>Speichern</button>
         <button onClick={handleDeploy} disabled={hasErrors}>
           Deploy
         </button>
         {deployState.kind !== 'idle' && (
-          <span style={{ fontSize: 12, color: deployState.kind === 'error' ? '#b91c1c' : '#374151' }}>
+          <span style={{ fontSize: 12, color: deployState.kind === 'error' ? 'var(--danger)' : 'var(--fg-muted)' }}>
             {deployState.kind === 'saving' && 'Speichere…'}
             {deployState.kind === 'deploying' && 'Deploye…'}
             {(deployState.kind === 'ok' || deployState.kind === 'error') && deployState.message}

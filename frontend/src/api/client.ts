@@ -56,6 +56,38 @@ export function deployTopology(topology: Topology): Promise<DeployResponse> {
   }).then((r) => json(r));
 }
 
+export interface SoundInfo {
+  name: string;
+  /** Value to store in an IVR greeting field, e.g. "custom/willkommen". */
+  reference: string;
+  sizeBytes: number;
+  updatedAt: string;
+  durationSeconds: number;
+}
+
+export function fetchSounds(): Promise<{ sounds: SoundInfo[] }> {
+  return fetch('/api/sounds').then((r) => json(r));
+}
+
+export async function uploadSound(name: string, wav: Blob): Promise<SoundInfo> {
+  const res = await fetch(`/api/sounds/${encodeURIComponent(name)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'audio/wav' },
+    body: wav,
+  });
+  const body = await json<{ sound?: SoundInfo; error?: string }>(res);
+  if (!res.ok || !body.sound) throw new Error(body.error ?? 'Upload fehlgeschlagen.');
+  return body.sound;
+}
+
+export function deleteSound(name: string): Promise<{ deleted: boolean }> {
+  return fetch(`/api/sounds/${encodeURIComponent(name)}`, { method: 'DELETE' }).then((r) => json(r));
+}
+
+export function soundUrl(name: string): string {
+  return `/api/sounds/${encodeURIComponent(name)}`;
+}
+
 export function connectStatusSocket(onStatus: (statuses: NodeStatus[]) => void): () => void {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const ws = new WebSocket(`${proto}://${location.host}/ws/status`);

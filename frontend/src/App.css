@@ -1,20 +1,204 @@
+/*
+ * Design tokens. Every colour in the app comes from here — nothing hardcodes a
+ * hex value — so light and dark are two value sets rather than two codebases.
+ *
+ * Theme resolution:
+ *   1. :root holds the light values.
+ *   2. @media (prefers-color-scheme: dark) applies dark when the OS asks for it.
+ *   3. :root[data-theme="..."] overrides both, so the manual toggle wins in
+ *      either direction (forcing light on a dark OS, and vice versa).
+ */
+:root {
+  --bg: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-subtle: #f9fafb;
+  --bg-canvas: #fbfbfd;
+  --bg-input: #ffffff;
+  --bg-hover: #f3f4f6;
+
+  --fg: #111827;
+  --fg-muted: #6b7280;
+  --fg-inverted: #ffffff;
+
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+
+  --accent: #2563eb;
+  --danger: #b91c1c;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+  --success: #16a34a;
+  --warning: #92400e;
+
+  --node-extension: #2563eb;
+  --node-ivr: #7c3aed;
+  --node-ringgroup: #d97706;
+  --node-queue: #0d9488;
+  --node-voicemail: #64748b;
+  --node-reserved: #9ca3af;
+
+  --status-online: #22c55e;
+  --status-offline: #ef4444;
+  --status-unknown: #9ca3af;
+
+  --edge-stroke: #9ca3af;
+  --grid-dot: #d1d5db;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  --focus-ring: rgba(37, 99, 235, 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1117;
+    --bg-elevated: #171a21;
+    --bg-subtle: #1b1f27;
+    --bg-canvas: #0b0d12;
+    --bg-input: #1b1f27;
+    --bg-hover: #232833;
+
+    --fg: #e5e7eb;
+    --fg-muted: #9ca3af;
+    --fg-inverted: #0f1117;
+
+    --border: #2a2f3a;
+    --border-strong: #3a4150;
+
+    --accent: #60a5fa;
+    --danger: #f87171;
+    --danger-bg: #2a1618;
+    --danger-border: #5b2528;
+    --success: #4ade80;
+    --warning: #fbbf24;
+
+    --node-extension: #3b82f6;
+    --node-ivr: #a78bfa;
+    --node-ringgroup: #f59e0b;
+    --node-queue: #14b8a6;
+    --node-voicemail: #94a3b8;
+    --node-reserved: #6b7280;
+
+    --edge-stroke: #6b7280;
+    --grid-dot: #2a2f3a;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+    --focus-ring: rgba(96, 165, 250, 0.45);
+  }
+}
+
+/* Manual override — must beat the media query above, hence the duplication. */
+:root[data-theme='light'] {
+  --bg: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-subtle: #f9fafb;
+  --bg-canvas: #fbfbfd;
+  --bg-input: #ffffff;
+  --bg-hover: #f3f4f6;
+
+  --fg: #111827;
+  --fg-muted: #6b7280;
+  --fg-inverted: #ffffff;
+
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+
+  --accent: #2563eb;
+  --danger: #b91c1c;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+  --success: #16a34a;
+  --warning: #92400e;
+
+  --node-extension: #2563eb;
+  --node-ivr: #7c3aed;
+  --node-ringgroup: #d97706;
+  --node-queue: #0d9488;
+  --node-voicemail: #64748b;
+  --node-reserved: #9ca3af;
+
+  --edge-stroke: #9ca3af;
+  --grid-dot: #d1d5db;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  --focus-ring: rgba(37, 99, 235, 0.4);
+}
+
+:root[data-theme='dark'] {
+  --bg: #0f1117;
+  --bg-elevated: #171a21;
+  --bg-subtle: #1b1f27;
+  --bg-canvas: #0b0d12;
+  --bg-input: #1b1f27;
+  --bg-hover: #232833;
+
+  --fg: #e5e7eb;
+  --fg-muted: #9ca3af;
+  --fg-inverted: #0f1117;
+
+  --border: #2a2f3a;
+  --border-strong: #3a4150;
+
+  --accent: #60a5fa;
+  --danger: #f87171;
+  --danger-bg: #2a1618;
+  --danger-border: #5b2528;
+  --success: #4ade80;
+  --warning: #fbbf24;
+
+  --node-extension: #3b82f6;
+  --node-ivr: #a78bfa;
+  --node-ringgroup: #f59e0b;
+  --node-queue: #14b8a6;
+  --node-voicemail: #94a3b8;
+  --node-reserved: #6b7280;
+
+  --edge-stroke: #6b7280;
+  --grid-dot: #2a2f3a;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  --focus-ring: rgba(96, 165, 250, 0.45);
+}
+
 * {
   box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
 }
 
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: #111827;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+/* Native controls (scrollbars, date pickers, form widgets) follow the theme. */
+:root {
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 button {
   cursor: pointer;
-  border: 1px solid #d1d5db;
-  background: #fff;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  color: var(--fg);
   border-radius: 4px;
   padding: 4px 8px;
   font-size: 12px;
+}
+
+button:hover:not(:disabled) {
+  background: var(--bg-hover);
 }
 
 button:disabled {
@@ -22,9 +206,18 @@ button:disabled {
   cursor: default;
 }
 
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
 input,
 select {
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-input);
+  color: var(--fg);
   border-radius: 4px;
   padding: 3px 6px;
   font-size: 12px;
@@ -33,4 +226,62 @@ select {
 table th,
 table td {
   vertical-align: middle;
+}
+
+code {
+  background: var(--bg-subtle);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/*
+ * React Flow ships light-only styles, so its chrome has to be re-pointed at the
+ * tokens or the canvas stays white in dark mode.
+ */
+.react-flow__renderer,
+.react-flow__pane {
+  background: var(--bg-canvas);
+}
+
+.react-flow__edge-path {
+  stroke: var(--edge-stroke);
+}
+
+.react-flow__edge-text {
+  fill: var(--fg);
+}
+
+.react-flow__edge-textbg {
+  fill: var(--bg-canvas);
+}
+
+.react-flow__controls-button {
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  fill: var(--fg);
+}
+
+.react-flow__controls-button:hover {
+  background: var(--bg-hover);
+}
+
+.react-flow__minimap {
+  background: var(--bg-subtle);
+}
+
+.react-flow__minimap-mask {
+  fill: color-mix(in srgb, var(--bg) 60%, transparent);
+}
+
+.react-flow__attribution {
+  background: transparent;
+  color: var(--fg-muted);
+}
+
+.react-flow__attribution a {
+  color: var(--fg-muted);
+}
+
+.react-flow__handle {
+  border-color: var(--bg-elevated);
 }

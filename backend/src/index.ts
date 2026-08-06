@@ -2,12 +2,16 @@ import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import http from 'http';
 import { topologyRouter } from './api/routes/topology';
+import { soundsRouter } from './api/routes/sounds';
 import { attachStatusWebSocket } from './api/ws';
 
 const PORT = Number(process.env.PORT ?? 4000);
 
 const app = express();
 app.use(cors());
+// The sounds router parses raw audio bodies itself, so it is mounted before the
+// JSON parser would try to read an upload as JSON.
+app.use('/api', soundsRouter);
 app.use(express.json({ limit: '2mb' }));
 app.use('/api', topologyRouter);
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
