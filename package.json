@@ -1,0 +1,15 @@
+{
+  "name": "visual-pbx",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "shared",
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "build:shared": "npm run build -w shared",
+    "dev:backend": "npm run dev -w backend",
+    "dev:frontend": "npm run dev -w frontend"
+  }
+}

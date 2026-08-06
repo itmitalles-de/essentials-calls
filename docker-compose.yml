@@ -1,0 +1,43 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      PORT: "4000"
+      DATA_DIR: /data
+      CONFIG_OUT_DIR: /shared-config
+      AMI_HOST: asterisk
+      AMI_PORT: "5038"
+      AMI_USERNAME: visualpbx
+      AMI_SECRET: visualpbx
+    volumes:
+      - pbx-data:/data
+      - asterisk-generated:/shared-config
+    ports:
+      - "4000:4000"
+    depends_on:
+      - asterisk
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+  asterisk:
+    build:
+      context: ./asterisk
+    volumes:
+      - asterisk-generated:/etc/asterisk/generated
+    ports:
+      - "5060:5060/udp"
+      - "5038:5038"
+      - "10000-10100:10000-10100/udp"
+
+volumes:
+  pbx-data:
+  asterisk-generated:
