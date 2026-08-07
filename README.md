@@ -1,88 +1,88 @@
 # Visual PBX
 
-Visueller Callflow-Editor für eine Telefonanlage. Der Graph wird in
-Asterisk-Konfiguration übersetzt und per AMI in einen laufenden Asterisk
-geladen. Läuft komplett als Docker-Compose-Stack.
+Visual call-flow editor for a phone system. The graph is translated into
+Asterisk configuration and loaded into a running Asterisk instance through AMI.
+Runs entirely as a Docker Compose stack.
 
-Proof of Concept — funktionsfähig und gegen einen laufenden Asterisk 18
-verifiziert, aber ohne Authentifizierung und ohne Trunk-Anbindung.
-Einschränkungen: [docs/roadmap.md](docs/roadmap.md).
+Proof of concept — functional and verified against a running Asterisk 18
+instance, but without authentication or trunk integration.
+Limitations: [docs/roadmap.md](docs/roadmap.md).
 
-## Starten
+## Start
 
 ```bash
-cp .env.example .env      # AMI_SECRET ändern
+cp .env.example .env      # change AMI_SECRET
 docker compose up -d --build
 ```
 
-Oberfläche: <http://localhost:8080>
+UI: <http://localhost:8080>
 
-Die Beispieltopologie (Alice, Bob, Support-Ringgruppe, Willkommens-IVR) wird
-beim ersten Start angelegt.
+The example topology (Alice, Bob, a support ring group, and a welcome IVR) is
+created on first start.
 
-## Was es kann
+## Features
 
-- **Einfache Ansicht** — Node-Graph-Editor: Nodes anlegen, Kanten ziehen,
-  Eigenschaften im Inspector bearbeiten.
-- **Erweiterte Ansicht** — dieselben Daten als Tabellen, plus Fehlerliste.
-- **Live-Validierung** — dieselben Regeln im Browser und im Backend; ein
-  fehlerhafter Callflow lässt sich nicht deployen.
-- **Deploy** — erzeugt `pjsip`-, `extensions`-, `queues`- und
-  `voicemail`-Config und lädt sie per AMI nach.
-- **IVR-Ansagen** — im Browser aufnehmen oder Datei hochladen; die Umwandlung
-  nach 8 kHz Mono WAV passiert im Browser.
-- **Live-Status** — registriert / im Gespräch / Queue-Wartende, per WebSocket.
-- **Dark Mode** — folgt dem System, manuell übersteuerbar, bleibt gespeichert.
+- **Simple view** — node graph editor: create nodes, draw edges, and edit
+  properties in the inspector.
+- **Advanced view** — the same data as tables, plus an error list.
+- **Live validation** — the same rules run in the browser and backend; an
+  invalid call flow cannot be deployed.
+- **Deploy** — generates `pjsip`, `extensions`, `queues`, and `voicemail`
+  configuration and loads it through AMI.
+- **IVR prompts** — record in the browser or upload a file; conversion to
+  8 kHz mono WAV happens in the browser.
+- **Live status** — registered / in a call / waiting in a queue, via WebSocket.
+- **Dark mode** — follows the system, can be overridden manually, and persists.
 
-## Schnell testen
+## Quick Test
 
 ```bash
-# Registrierung prüfen, ohne Softphone
+# Check registration without a softphone
 python3 scripts/sip-register-test.py 101 alice123
 
-# Callflow anstoßen, ohne Telefon
+# Start a call flow without a phone
 docker compose exec asterisk asterisk -rx "channel originate Local/603@internal application Wait 6"
 docker compose exec asterisk cat /var/log/asterisk/cdr-csv/Master.csv | tail -2
 ```
 
-Mit einem Softphone: gegen `<host>:5060` registrieren, Benutzer `101` /
-Passwort `alice123` (bzw. `102` / `bob123`). Dann `101`, `102` oder die
-Testnummern ab `600` wählen — je eine pro Node, weil es keinen Trunk gibt.
+With a softphone, register against `<host>:5060` with user `101` / password
+`alice123` (or `102` / `bob123`). Then dial `101`, `102`, or the test numbers
+starting at `600` — one per node, since there is no trunk.
 
-## Entwicklung
+## Development
 
 ```bash
 npm install
 npm run typecheck
-npm test            # 52 Tests: Validator, Config-Generator, Sound-Validierung
+npm test            # 52 tests: validator, config generator, prompt validation
 npm run build
 
-npm run dev:backend    # erwartet AMI auf localhost:5038
-npm run dev:frontend   # Vite auf :5173
+npm run dev:backend    # expects AMI on localhost:5038
+npm run dev:frontend   # Vite on :5173
 ```
 
-## Aufbau
+## Structure
 
 ```
-shared/    Domain-Modell + Validator (von Backend und Frontend genutzt)
-backend/   Express-API, Config-Generator, AMI-Client, Ansagen-Ablage
-frontend/  React + React Flow, ausgeliefert von nginx
-asterisk/  Asterisk 18 auf Ubuntu 22.04, Basis-Configs
+shared/    Domain model + validator (used by backend and frontend)
+backend/   Express API, config generator, AMI client, prompt storage
+frontend/  React + React Flow, served by nginx
+asterisk/  Asterisk 18 on Ubuntu 22.04, base configurations
 scripts/   sip-register-test.py
 ```
 
-## Dokumentation
+## Documentation
 
-| Dokument | Inhalt |
+| Document | Contents |
 |---|---|
-| [Architektur](docs/architecture.md) | Komponenten, Datenfluss, Deploy-Pipeline |
-| [Domain-Modell](docs/domain-model.md) | Topologie und alle Validierungsregeln |
-| [Asterisk-Abbildung](docs/asterisk-mapping.md) | Wie aus Nodes Config wird |
-| [API](docs/api.md) | REST und WebSocket |
-| [Betrieb](docs/operations.md) | Konfiguration, Testen, Fehlersuche, Sicherheit |
-| [Fallstricke](docs/asterisk-notes.md) | Was erst im laufenden Asterisk auffiel |
-| [Stand und Offenes](docs/roadmap.md) | Verifiziertes, Grenzen, mögliche Schritte |
+| [Architecture](docs/architecture.md) | Components, data flow, and deployment pipeline |
+| [Domain model](docs/domain-model.md) | Topology and all validation rules |
+| [Asterisk mapping](docs/asterisk-mapping.md) | How nodes become configuration |
+| [API](docs/api.md) | REST and WebSocket |
+| [Operations](docs/operations.md) | Configuration, testing, troubleshooting, and security |
+| [Pitfalls](docs/asterisk-notes.md) | What only became apparent with a running Asterisk |
+| [Status and roadmap](docs/roadmap.md) | Verified behavior, limitations, and possible next steps |
 
-Wer an der Asterisk-Erzeugung arbeitet, sollte mit
-[docs/asterisk-notes.md](docs/asterisk-notes.md) anfangen: Dort steht, welche
-Konstrukte fehlerfrei laden und trotzdem nicht funktionieren.
+Anyone working on Asterisk generation should start with
+[docs/asterisk-notes.md](docs/asterisk-notes.md): it explains which constructs
+load without errors but still do not work.
