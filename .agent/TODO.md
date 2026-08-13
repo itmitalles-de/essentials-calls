@@ -2,20 +2,21 @@
 
 ## Now
 
-- [ ] Add a live assertion that a newly uploaded custom WAV is group-readable
-  by Asterisk and actually traversed by a synthetic IVR call. Unit/API file-mode
-  and reference-protection tests exist, but this exact runtime proof has not
-  been added.
-- [ ] Run the final complete regression after the latest hardening changes:
-  `npm ci`, audit, typecheck, 95 tests, build, both Compose validations, all
-  image builds, Playwright, full Asterisk/SIPp, and live backup/empty restore.
-- [ ] In particular, re-run Playwright after the latest undo/save/reload and
-  WebSocket-session changes, and re-run the Docker suites after legacy-source
-  cleanup, sound GID handling, and stricter AMI environment validation.
-- [ ] Review the final diff for secrets, generated artifacts, inconsistent
-  branding, stale claims, and unintended package/repository renames.
-- [ ] After the requested direct merge/push, inspect the `master` GitHub checks
-  and address concrete failures. No new draft PR is required for this snapshot.
+- [ ] Diagnose the fresh Playwright failure at `tests/e2e/app.spec.ts:145`.
+  After saving a topology containing `E2E Extension`, one Undo leaves the node
+  visible although the new assertion expects it to disappear. Decide the
+  intended save/history boundary, then fix either the implementation or the
+  assertion without weakening semantic coverage.
+- [ ] Re-run all 8 Playwright tests after that fix. The 2026-08-13 run stopped
+  after test 1 failed, so tests 2-8 were not executed on the final snapshot.
+- [ ] Run `npm run test:backup-restore`. This live empty-restore suite was not
+  run in the latest continuation and still predates the recent hardening and
+  custom-WAV acceptance changes.
+- [ ] Re-run any checks affected by the browser fix, then perform the final
+  secret/generated-artifact/branding/package-name diff review.
+- [ ] Push the local `master` commit only after the remaining regression is
+  green, then inspect the `master` GitHub checks and address concrete failures.
+  No new draft PR is required; existing draft PR #2 is unrelated.
 
 ## Blocked
 

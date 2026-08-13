@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises';
+import { createSocket } from 'node:dgram';
+import { readFile, stat } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
 import path from 'node:path';
@@ -14,6 +15,12 @@ const ADMIN_USERNAME = process.env.ACCEPTANCE_ADMIN_USERNAME ?? 'synthetic-admin
 const ADMIN_PASSWORD = process.env.ACCEPTANCE_ADMIN_PASSWORD ?? '';
 const ARTIFACT_ROOT = process.env.ACCEPTANCE_ARTIFACT_DIR ?? '/artifacts';
 const FIXTURE = path.resolve('fixtures/topology-v1.json');
+const SHARED_SOUNDS_DIR = process.env.ACCEPTANCE_SOUNDS_DIR ?? '/shared-sounds';
+const ASTERISK_SOUND_GID = Number(process.env.ACCEPTANCE_ASTERISK_GID ?? 101);
+const CUSTOM_PROMPT_NAME = 'synthetic-live-ivr';
+const CUSTOM_PROMPT_REFERENCE = `custom/${CUSTOM_PROMPT_NAME}`;
+const CUSTOM_PROMPT_DURATION_SECONDS = 3;
+const CUSTOM_PROMPT_MEDIA_PORT = 16040;
 const SYNTHETIC_SIP_SECRETS = [
   'synthetic-101-pass-2026',
   'synthetic-102-pass-2026',
@@ -33,6 +40,30 @@ function record(name, details = '') {
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function pcmToneWav(durationSeconds = CUSTOM_PROMPT_DURATION_SECONDS) {
+  const sampleRate = 8000;
+  const sampleCount = sampleRate * durationSeconds;
+  const dataBytes = sampleCount * 2;
+  const wav = Buffer.alloc(44 + dataBytes);
+  wav.write('RIFF', 0, 'ascii');
+  wav.writeUInt32LE(36 + dataBytes, 4);
+  wav.write('WAVEfmt ', 8, 'ascii');
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(sampleRate, 24);
+  wav.writeUInt32LE(sampleRate * 2, 28);
+  wav.writeUInt16LE(2, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write('data', 36, 'ascii');
+  wav.writeUInt32LE(dataBytes, 40);
+  for (let sample = 0; sample < sampleCount; sample++) {
+    const value = Math.round(Math.sin(2 * Math.PI * 440 * sample / sampleRate) * 12_000);
+    wav.writeInt16LE(value, 44 + sample * 2);
+  }
+  return wav;
 }
 
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -107,6 +138,53 @@ async function importFixture() {
   activeRevision = imported.body.activeRevision;
   invariant(imported.body.topology.nodes.every((node) => !node.properties?.sipPassword), 'Plaintext secret leaked after migration.');
   record('atomic legacy import with redacted secrets', `revision ${revision}`);
+}
+
+async function uploadCustomIvrPrompt() {
+  invariant(Number.isInteger(ASTERISK_SOUND_GID) && ASTERISK_SOUND_GID >= 0, 'Synthetic Asterisk sound GID is invalid.');
+  const upload = await api(`/sounds/${CUSTOM_PROMPT_NAME}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'audio/wav' },
+    body: pcmToneWav(),
+  });
+  invariant(
+    upload.response.ok && upload.body.sound?.reference === CUSTOM_PROMPT_REFERENCE,
+    `Custom WAV upload failed: HTTP ${upload.response.status} ${upload.body.error ?? ''}`
+  );
+
+  const [directoryInfo, fileInfo] = await Promise.all([
+    stat(SHARED_SOUNDS_DIR),
+    stat(path.join(SHARED_SOUNDS_DIR, `${CUSTOM_PROMPT_NAME}.wav`)),
+  ]);
+  const directoryMode = directoryInfo.mode & 0o777;
+  const fileMode = fileInfo.mode & 0o777;
+  invariant(
+    directoryInfo.gid === ASTERISK_SOUND_GID && directoryMode === 0o750,
+    `Custom sound directory is not Asterisk-traversable (gid=${directoryInfo.gid}, mode=${directoryMode.toString(8)}).`
+  );
+  invariant(
+    fileInfo.gid === ASTERISK_SOUND_GID && fileMode === 0o640,
+    `Uploaded custom WAV is not group-readable by Asterisk (gid=${fileInfo.gid}, mode=${fileMode.toString(8)}).`
+  );
+  record('custom WAV upload is group-readable by Asterisk', `gid ${fileInfo.gid}, mode ${fileMode.toString(8)}`);
+
+  const current = await loadTopology();
+  const topology = structuredClone(current.topology);
+  const ivr = topology.nodes.find((node) => node.id === 'ivr-main');
+  invariant(ivr?.type === 'ivr', 'Synthetic IVR node is missing.');
+  ivr.properties.greeting = CUSTOM_PROMPT_REFERENCE;
+  const saved = await api('/topology', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'If-Match': `"rev-${revision}"`,
+      'X-Revision-Comment': 'Use uploaded synthetic IVR prompt',
+    },
+    body: JSON.stringify(topology),
+  });
+  invariant(saved.response.ok && saved.body.saved, `Custom IVR topology save failed: HTTP ${saved.response.status}`);
+  revision = saved.body.revision;
+  activeRevision = saved.body.activeRevision;
 }
 
 async function blockedDeploy() {
@@ -323,6 +401,56 @@ async function directCallAndReregistration(ami) {
   } finally {
     replacement.stop();
   }
+}
+
+async function customIvrMedia(ami) {
+  const socket = createSocket('udp4');
+  let rtpPackets = 0;
+  let rtpBytes = 0;
+  const payloadValues = new Set();
+  socket.on('message', (message) => {
+    if (message.length < 12 || message[0] >> 6 !== 2) return;
+    const payloadType = message[1] & 0x7f;
+    if (payloadType !== 0 && payloadType !== 8) return;
+    const payloadOffset = 12 + (message[0] & 0x0f) * 4;
+    if (payloadOffset >= message.length) return;
+    rtpPackets += 1;
+    rtpBytes += message.length - payloadOffset;
+    for (const value of message.subarray(payloadOffset)) payloadValues.add(value);
+  });
+  await new Promise((resolve, reject) => {
+    const onError = (error) => reject(error);
+    socket.once('error', onError);
+    socket.bind(CUSTOM_PROMPT_MEDIA_PORT, '0.0.0.0', () => {
+      socket.off('error', onError);
+      resolve();
+    });
+  });
+
+  const before = ami.events.length;
+  const input = '/tmp/custom-ivr-media.csv';
+  await BunCompatWrite(input, `SEQUENTIAL\nsynthetic-101-pass-2026;604;${CUSTOM_PROMPT_MEDIA_PORT}\n`);
+  try {
+    await runSipp([
+      ASTERISK_HOST, '-sf', 'scenarios/uac-media.xml', '-inf', input, '-s', '101',
+      '-au', '101', '-ap', 'synthetic-101-pass-2026', '-p', '5104',
+      '-m', '1', '-nostdin',
+    ], 'custom IVR media call', 30_000);
+    await waitFor(
+      'custom IVR Background application',
+      () => ami.events.slice(before).some(
+        (event) => event.Event === 'Newexten' &&
+          event.Application?.toLowerCase() === 'background' &&
+          event.AppData === CUSTOM_PROMPT_REFERENCE
+      ),
+      5000
+    );
+  } finally {
+    socket.close();
+  }
+  invariant(rtpPackets >= 20 && rtpBytes >= 3200, `Custom IVR prompt produced insufficient RTP media (${rtpPackets} packets, ${rtpBytes} bytes).`);
+  invariant(payloadValues.size >= 8, `Custom IVR RTP media did not contain the uploaded tone (${payloadValues.size} payload values).`);
+  record('uploaded custom WAV traverses a synthetic IVR media call', `${rtpPackets} RTP packets`);
 }
 
 async function BunCompatWrite(file, content) {
@@ -570,6 +698,7 @@ async function main() {
     return;
   }
   await importFixture();
+  await uploadCustomIvrPrompt();
   await blockedDeploy();
   const deployed = await deploy();
   const ami = new AmiConnection();
@@ -578,6 +707,7 @@ async function main() {
     const version = await ami.command('core show version');
     invariant(/Asterisk 18\./.test(version), `Unexpected Asterisk major: ${version}`);
     record('Asterisk 18 runtime without configuration rejection');
+    await customIvrMedia(ami);
     await directCallAndReregistration(ami);
     await syntheticCallflows(ami);
     await queueUnavailableTimeoutFallback(ami);

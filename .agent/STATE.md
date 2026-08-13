@@ -5,7 +5,7 @@
 - Visible product: **Essentials+ Calls**.
 - Technical repository/npm namespace: `visual-pbx` (intentionally unchanged).
 - Default branch: `master` (intentionally unchanged).
-- Current work branch: `agent/essentials-calls-autonomous`.
+- Current work branch: `master`.
 - Asterisk base: Ubuntu 22.04 package, Asterisk 18.x (no major migration).
 - Scope: hardened local/synthetic proof of concept, not production telephony.
 
@@ -24,7 +24,8 @@
 - Versioned v2 JSON schema, 2 MiB import limit, v1 migration, dry-run,
   atomic import, and redacted normal export.
 - Sound inventory validation, all-reference display, protected delete,
-  deliberate replacement, and atomic WAV upload.
+  deliberate replacement, atomic WAV upload, and live synthetic proof that an
+  uploaded prompt is group-readable and emits RTP through the IVR.
 - Bounded undo/redo excluding selection/viewport, keyboard shortcuts, graph and
   table editing, role UI, revisions, theme persistence.
 - Schedule node with IANA timezone, windows, explicit holidays, two outputs,
@@ -44,24 +45,29 @@
 
 ## Verified locally on 2026-08-13
 
-- `npm audit --audit-level=moderate`: zero advisories.
-- After the latest source changes, `npm run typecheck`, `npm test`,
-  `npm run build`, and `git diff --check`: passed.
+- Fresh `npm ci` and `npm audit --audit-level=moderate`: passed with zero
+  advisories after updating transitive `nanoid` from 3.3.17 to 3.3.18 for
+  GHSA-2v37-7h3g-55p8.
+- `npm run typecheck`, `npm test`, `npm run build`, both Compose model
+  validations, all Compose image builds, and `git diff --check`: passed.
 - Tests: 29 shared and 66 backend (95 total), no skips/todos.
-- Last fresh Playwright/Compose run: 8/8 semantic tests passed. It predates the
-  latest editor-history assertion and WebSocket session-revalidation patch, so
-  a final fresh run is still required.
-- Last fresh Asterisk/SIPp acceptance: 22 semantic checks passed, then restart and
-  SQLite/active-deployment persistence passed.
+- Fresh Asterisk/SIPp acceptance: 24 semantic checks passed, then restart and
+  SQLite/active-deployment persistence passed. It uploads a generated 8 kHz
+  WAV, verifies directory mode 0750 and file mode 0640 with Asterisk GID 101,
+  observes `BackGround(custom/synthetic-live-ivr)`, and receives 150 RTP
+  packets during the synthetic IVR call.
 - Registration includes multiple endpoints and replacement registration.
 - Calls cover direct internal, ring group, queue, schedule open path, IVR
   playback/timeout/valid-invalid DTMF, voicemail, AMI channel/queue/hangup, CDR,
   WebSocket, deploy, invalid block, reload, corrupt activation rollback.
+- The fresh Playwright run did not pass: test 1 expected one Undo after saving
+  to remove `E2E Extension`, but the node remained visible at
+  `tests/e2e/app.spec.ts:145`; the remaining 7 tests did not run. An older 8/8
+  pass exists, but the current browser regression remains open.
 - Live backup/empty restore previously passed source calls, checksummed archive,
-  separate key, target restore, and post-restore callflows. The full-stack and
-  restore runs predate the latest migration/file-mode/AMI-input hardening.
-- Compose validation and image builds previously passed; images have not been
-  rebuilt since the latest Asterisk entrypoint and sound-volume changes.
+  separate key, target restore, and post-restore callflows. It was not rerun in
+  this continuation and predates the latest migration/file-mode/AMI-input and
+  custom-WAV acceptance changes.
 
 ## Evidence boundary
 
@@ -72,8 +78,8 @@ customer NAT/firewall, or production behavior has been verified. See
 
 ## Publication state
 
-The hardening snapshot is committed locally. On 2026-08-13 the user explicitly
-requested a direct merge/push/sync rather than the earlier planned draft PR;
-the next operation therefore fast-forwards `master` after refreshing its remote
-state. Existing GitHub draft PR #2 is unrelated and must not be merged or
-repurposed. The exact unfinished technical work is recorded in `.agent/TODO.md`.
+The earlier hardening snapshot is on `master` and `origin/master` at `e0e05d0`.
+This continuation is committed locally on `master` but intentionally not pushed
+because the user requested a pause. Existing GitHub draft PR #2 is unrelated
+and must not be merged or repurposed. The exact unfinished technical work is
+recorded in `.agent/TODO.md`.
