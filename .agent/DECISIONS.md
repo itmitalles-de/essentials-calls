@@ -1,69 +1,164 @@
-# Decisions
+# Durable Decisions
 
-The detailed, authoritative rationale is in the **Bewusste Entscheidungen**
-section of [`../docs/roadmap.md`](../docs/roadmap.md). This file is a concise
-index of the implemented choices future agents must not casually undo.
+This file records non-obvious decisions that future work must preserve unless a
+new explicit decision supersedes them.
 
-## Browser-side audio conversion
+## Product identity and positioning
 
-**Decision:** Convert recorded and uploaded prompts to 8 kHz mono WAV in the
-browser.
+### Essentials+ Calls is the product; Visual PBX is historical
 
-**Reason:** Recording and upload share one Web Audio path without adding ffmpeg
-to the backend image.
+The customer-facing name is **Essentials+ Calls**, the short UI name is
+**Calls**, and the technical/repository slug is **`calls`**. Visual PBX may be
+used only for the historical prototype or temporary legacy identifiers.
 
-**Alternatives considered:** Server-side conversion with ffmpeg.
+Reason: the old name describes one UI mechanism and incorrectly frames the
+product as a generic PBX. Calls belongs to the modular Essentials+ product
+family and must be understandable without telephony jargon.
 
-**Consequences:** Microphone capture requires a secure browser context; the
-backend must still validate WAV headers and sizes.
+### The visual editor is a tool, not the market position
 
-## Generated files plus AMI reload
+Do not position the product as unique merely because it has a graph editor.
+Prioritize business templates, guided setup, safe publish, diff, rollback,
+health, and integration with real workflows.
 
-**Decision:** Generate readable Asterisk config files into a shared volume and
-reload them through AMI.
+Reason: mature telephony products already provide visual routing and broad
+feature sets. Calls must differentiate through clarity, modularity, integration,
+provider independence, and managed operation.
 
-**Reason:** File generation keeps the PoC dialplan inspectable; AMI cannot write
-the files, and files do not become active without a reload.
+### Managed service before public self-service
 
-**Alternatives considered:** Asterisk Realtime backed by a database.
+The first real installations are productized, managed deployments for two to
+three suitable customers from the existing network. Public self-service and
+broad provider/device matrices are deferred until onboarding and support are
+repeatable.
 
-**Consequences:** Preserve static/generated config separation, validate before
-writing, and test actual call behavior rather than only successful loading.
+Reason: telephony failures are operationally expensive. Managed pilots generate
+real evidence while limiting combinations and blast radius.
 
-## One shared validator
+### Calls is not a carrier or general UC suite
 
-**Decision:** Keep the topology model and validator in `shared/` for both
-frontend and backend.
+The SIP provider remains a separate specialist provider, preferably contracted
+directly by the customer. Chat, meetings, video, own softphones, AI reception,
+and enterprise contact-center scope are not core pilot requirements.
 
-**Reason:** The editor needs immediate feedback while the backend must not trust
-client-side validation; one implementation prevents rule drift.
+Reason: this avoids regulatory and operational scope expansion and prevents a
+feature-by-feature competition with mature suites.
 
-**Alternatives considered:** Separate browser and server validators.
+## Essentials+ modularity
 
-**Consequences:** Domain changes must remain compatible with both build paths,
-and the backend must still validate every untrusted request.
+### Central identity and entitlements, Calls-owned telephony domain
 
-## Ephemeral runtime status
+The Essentials+ control plane owns organizations, users, roles, module
+entitlements, common navigation, and shared lifecycle concepts. Calls owns
+numbers, endpoints, call flows, provider profiles, runtime deployment, and
+telephony status.
 
-**Decision:** Keep endpoint/call/queue status separate from the persisted
-topology and push it over WebSocket.
+UI visibility is not authorization. Every protected Calls action must validate
+role and module entitlement server-side.
 
-**Reason:** Status is a momentary observation of Asterisk, not call-flow design.
+### Only active modules in daily navigation
 
-**Alternatives considered:** Storing status fields in `topology.json`.
+Customers see enabled modules in normal navigation. A separate compatible module
+catalog may show extensions available to that tenant for intentional activation.
+Unsupported or incompatible modules are not presented as usable controls.
 
-**Consequences:** Asterisk outages produce `unknown` status without corrupting
-the topology; reconnecting clients must obtain fresh state.
+Reason: modularity should reduce cognitive load rather than create a showroom of
+disabled switches.
 
-## Single-file proof-of-concept persistence
+## Runtime and tenancy
 
-**Decision:** Store the call-flow source of truth as one `topology.json` file;
-generated Asterisk files are disposable derivatives.
+### Isolated runtime per early customer/site
 
-**Reason:** The current scope assumes a single trusted editor and does not need
-a database or collaboration model.
+Initial pilots use a dedicated Calls/Asterisk runtime per customer or site. A
+shared multi-tenant media plane is explicitly deferred.
 
-**Alternatives considered:** Database persistence with locking and history.
+Reason: isolation reduces security, privacy, abuse, upgrade, and incident blast
+radius while product behavior is still changing.
 
-**Consequences:** Concurrent saves can overwrite each other. Do not claim
-multi-user safety, and back up the topology and prompt volume, not generated config.
+### Control-plane outage must not stop active calls
+
+The future Essentials+/Calls control plane distributes configuration and manages
+lifecycle, but the local runtime continues using the last known-good deployment
+when the control plane is unavailable.
+
+Reason: administrative convenience must not become a new real-time dependency
+for basic phone calls.
+
+### Keep generated config plus explicit deploy for now
+
+Continue generating readable Asterisk configuration and using an explicit
+validated deploy/reload path. Do not replace it with realtime database or ARI
+orchestration without measured requirements.
+
+Reason: the current approach is auditable, testable, and understandable. The
+missing controls are revisioning, atomicity, health checks, and rollback, not a
+more fashionable configuration mechanism.
+
+### Supported Asterisk LTS before pilot
+
+The Asterisk 18 PoC baseline must move to Asterisk 22 LTS or the then current
+supported LTS before external pilot use.
+
+Reason: new production work must not be built on an end-of-life telephony core.
+
+## Data and deployment
+
+### One topology is the desired-state source of truth
+
+The editor views manipulate one shared topology. Generated Asterisk files are
+derived artifacts. Runtime status, CDRs, audit events, and secrets are separate
+concerns and must not be embedded into desired-state topology.
+
+### Same validation in browser and backend
+
+Shared validation remains a deliberate boundary. Frontend validation is fast
+feedback; backend validation is authoritative and mandatory before save or
+publish.
+
+### Draft and active state are separate
+
+Saving an edit must never implicitly change live telephone behavior. Publishing
+creates an immutable revision, validates it, applies it atomically, checks
+health, and records the result. A last known-good revision must be restorable.
+
+### Legacy names are migrated separately
+
+Product naming, GitHub repository naming, npm package scopes, container names,
+and persistent data paths are separate migrations. Do not rename packages,
+volumes, or stored paths casually inside product work.
+
+Reason: a cosmetic rebrand must not create avoidable lockfile churn or data loss.
+
+## Status and events
+
+### Status is ephemeral operational data
+
+Live endpoint, queue, and call status is not persisted in topology. The current
+polling implementation may later become AMI event subscriptions, but the domain
+separation remains.
+
+### Browser performs prompt conversion
+
+Keep browser-side resampling/encoding to 8 kHz mono WAV unless a verified reason
+requires server-side media processing. The backend still validates the final
+file before storage.
+
+## Security and compliance
+
+### Secrets are not topology fields in the target product
+
+Provider and endpoint secrets must be stored through a separate protected
+secret layer, masked in APIs, excluded from exports/logs, and rotatable without
+returning old values.
+
+### Recording/transcription is opt-in and compliance-gated
+
+No default call recording. Any future recording or transcription module needs
+explicit purpose, permissions, notice/consent handling where required,
+retention, deletion, encryption, and audit controls before activation.
+
+### Public outbound calling requires an emergency/location decision
+
+No customer cutover with public outbound calling until provider responsibility,
+caller-ID behavior, location data, and 110/112 routing are explicitly defined
+and tested for the deployment.

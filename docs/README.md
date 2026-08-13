@@ -1,32 +1,49 @@
-# Dokumentation
+# Essentials+ Calls documentation
 
-Stand: 2026-08-06. Beschreibt den PoC so, wie er im Repo liegt und gegen einen
-laufenden Asterisk 18 verifiziert wurde.
+This repository contains two deliberately separate layers of documentation:
 
-| Dokument | Inhalt |
+1. the **implemented proof-of-concept reality**, and
+2. the **product direction required to turn it into Essentials+ Calls**.
+
+Do not describe target features as implemented. The runtime baseline was last
+verified against Asterisk 18 on 2026-08-06; production work must move to a
+supported LTS release before any customer pilot.
+
+| Document | Purpose |
 |---|---|
-| [architecture.md](architecture.md) | Komponenten, Datenfluss, Deploy-Pipeline |
-| [domain-model.md](domain-model.md) | Topology-Modell und alle Validierungsregeln |
-| [asterisk-mapping.md](asterisk-mapping.md) | Wie aus Nodes und Kanten Asterisk-Config wird |
-| [api.md](api.md) | REST- und WebSocket-Schnittstelle |
-| [operations.md](operations.md) | Betrieb, Konfiguration, Testen, Fehlersuche |
-| [asterisk-notes.md](asterisk-notes.md) | Fallstricke, die erst im laufenden Asterisk auffielen |
-| [roadmap.md](roadmap.md) | Was fehlt, und was es kosten würde |
+| [product-strategy.md](product-strategy.md) | Product positioning, module model, pilot scope, target architecture, go-to-market |
+| [roadmap.md](roadmap.md) | Current status, ordered execution phases, gates, and backlog |
+| [architecture.md](architecture.md) | Implemented components and data flow |
+| [domain-model.md](domain-model.md) | Current topology model and validation rules |
+| [asterisk-mapping.md](asterisk-mapping.md) | Mapping from nodes and edges to generated Asterisk config |
+| [api.md](api.md) | Current REST and WebSocket contract |
+| [operations.md](operations.md) | Current operation, configuration, testing, and troubleshooting |
+| [asterisk-notes.md](asterisk-notes.md) | Runtime-discovered Asterisk and React Flow constraints |
 
-Wer nur schnell starten will: [../README.md](../README.md).
+For a quick start, see [../README.md](../README.md).
 
-## Was der PoC kann
+## Naming
 
-- Callflows als Graph bearbeiten (ComfyUI-artiger Editor) oder als Tabellen.
-- Topologie live validieren — dieselben Regeln im Browser und im Backend.
-- Daraus Asterisk-Config erzeugen und per AMI in einen laufenden Asterisk laden.
-- IVR-Ansagen im Browser aufnehmen oder hochladen.
-- Node-Status (registriert / im Gespräch / Queue-Wartende) live anzeigen.
-- Dark Mode nach Systemeinstellung, manuell übersteuerbar.
+- Customer-facing product: **Essentials+ Calls**
+- Short UI name: **Calls**
+- Technical slug and target repository name: **`calls`**
+- Historical prototype name: **Visual PBX**
 
-## Was er nicht kann
+The historical name may appear only where a migration or old implementation
+identifier is explicitly discussed. It is no longer the product name.
 
-Kein Trunk/DID, also keine Anbindung an das öffentliche Telefonnetz; erreichbar
-sind interne Extensions und generierte Test-Nummern. Kein Mehrbenutzerbetrieb,
-keine Rechteverwaltung, keine Historie. Details und Aufwandsschätzung in
-[roadmap.md](roadmap.md).
+## What the current PoC can do
+
+- Edit call flows as a graph or tables.
+- Validate one topology with the same rules in browser and backend.
+- Generate Asterisk configuration and reload it through AMI.
+- Record or upload IVR prompts.
+- Show endpoint, call, and queue status.
+- Run as a Docker Compose stack on a trusted network.
+
+## What the current PoC cannot do
+
+It has no trunk/DID, no public telephone network integration, no authentication,
+no secure secret model, no multi-user history, no opening-hours model, and no
+production hardening. The strategy does not erase these limits. It defines the
+ordered work needed to remove them safely.

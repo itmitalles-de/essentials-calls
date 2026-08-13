@@ -67,7 +67,7 @@ export default function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <header style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', borderBottom: '1px solid var(--border)' }}>
-        <strong>Visual PBX</strong>
+        <strong>Essentials+ Calls</strong>
         <nav style={{ display: 'flex', gap: 4 }}>
           <button onClick={() => setTab('simple')} disabled={tab === 'simple'}>
             Einfach

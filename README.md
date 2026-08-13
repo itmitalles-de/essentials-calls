@@ -1,88 +1,89 @@
-# Visual PBX
+# Essentials+ Calls
 
-Visual call-flow editor for a phone system. The graph is translated into
-Asterisk configuration and loaded into a running Asterisk instance through AMI.
-Runs entirely as a Docker Compose stack.
+**Essentials+ Calls** is the modular business-telephony component of
+Essentials+. It turns call routing into understandable business rules instead
+of exposing customers to raw PBX configuration.
 
-Proof of concept — functional and verified against a running Asterisk 18
-instance, but without authentication or trunk integration.
-Limitations: [docs/roadmap.md](docs/roadmap.md).
+The current implementation originated as the **Visual PBX** proof of concept.
+It already provides a visual Asterisk call-flow editor, shared validation,
+config generation, prompt handling, deployment through AMI, and live runtime
+status. It is a strong technical prototype, but it is **not production-ready**.
 
-## Start
+The customer-facing product name is **Essentials+ Calls**. The technical slug
+and target repository name are **`calls`**.
+
+## Product direction
+
+Calls is not intended to become another generic cloud PBX or a full unified
+communications suite. The initial product is a managed, provider-independent
+service for small German businesses, with isolated runtimes, clear templates,
+safe publishing, rollback, and later integration with other Essentials+
+modules.
+
+Read the authoritative product direction before expanding scope:
+
+- [Product strategy](docs/product-strategy.md)
+- [Execution roadmap](docs/roadmap.md)
+- [Current implemented architecture](docs/architecture.md)
+
+## Current proof-of-concept capabilities
+
+- Graph-based call-flow editor with React Flow
+- Advanced table-oriented editor
+- Shared frontend/backend topology validation
+- Asterisk PJSIP, dialplan, queue, and voicemail config generation
+- Explicit save and deploy flow with AMI reload
+- Prompt recording/upload and browser-side 8 kHz mono WAV conversion
+- Live endpoint, call, and queue status over WebSocket
+- Docker Compose runtime with frontend, backend, and Asterisk
+
+## Current hard limits
+
+- No authentication or authorization
+- SIP secrets stored in plaintext and returned through the API
+- No SIP trunk, DID, public inbound routing, or production outbound calling
+- No opening-hours or holiday model
+- No revision history, locking, audit log, or rollback
+- Single trusted editor and one JSON source-of-truth file
+- Asterisk 18 baseline, which must be replaced before a production pilot
+- Trusted-network proof of concept only; do not expose it to the public internet
+
+## Run the proof of concept
 
 ```bash
-cp .env.example .env      # change AMI_SECRET
 docker compose up -d --build
 ```
 
-UI: <http://localhost:8080>
+Open `http://localhost:8080`.
 
-The example topology (Alice, Bob, a support ring group, and a welcome IVR) is
-created on first start.
-
-## Features
-
-- **Simple view** — node graph editor: create nodes, draw edges, and edit
-  properties in the inspector.
-- **Advanced view** — the same data as tables, plus an error list.
-- **Live validation** — the same rules run in the browser and backend; an
-  invalid call flow cannot be deployed.
-- **Deploy** — generates `pjsip`, `extensions`, `queues`, and `voicemail`
-  configuration and loads it through AMI.
-- **IVR prompts** — record in the browser or upload a file; conversion to
-  8 kHz mono WAV happens in the browser.
-- **Live status** — registered / in a call / waiting in a queue, via WebSocket.
-- **Dark mode** — follows the system, can be overridden manually, and persists.
-
-## Quick Test
+Useful checks:
 
 ```bash
-# Check registration without a softphone
-python3 scripts/sip-register-test.py 101 alice123
-
-# Start a call flow without a phone
-docker compose exec asterisk asterisk -rx "channel originate Local/603@internal application Wait 6"
-docker compose exec asterisk cat /var/log/asterisk/cdr-csv/Master.csv | tail -2
-```
-
-With a softphone, register against `<host>:5060` with user `101` / password
-`alice123` (or `102` / `bob123`). Then dial `101`, `102`, or the test numbers
-starting at `600` — one per node, since there is no trunk.
-
-## Development
-
-```bash
-npm install
+npm test
 npm run typecheck
-npm test            # 52 tests: validator, config generator, prompt validation
 npm run build
-
-npm run dev:backend    # expects AMI on localhost:5038
-npm run dev:frontend   # Vite on :5173
+docker compose config
 ```
 
-## Structure
+Runtime telephony checks are documented in
+[docs/operations.md](docs/operations.md). A successful build or clean Asterisk
+config load does not prove that a real call path works.
 
-```
-shared/    Domain model + validator (used by backend and frontend)
-backend/   Express API, config generator, AMI client, prompt storage
-frontend/  React + React Flow, served by nginx
-asterisk/  Asterisk 18 on Ubuntu 22.04, base configurations
-scripts/   sip-register-test.py
-```
+## Repository layout
 
-## Documentation
-
-| Document | Contents |
+| Path | Responsibility |
 |---|---|
-| [Architecture](docs/architecture.md) | Components, data flow, and deployment pipeline |
-| [Domain model](docs/domain-model.md) | Topology and all validation rules |
-| [Asterisk mapping](docs/asterisk-mapping.md) | How nodes become configuration |
-| [API](docs/api.md) | REST and WebSocket |
-| [Operations](docs/operations.md) | Configuration, testing, troubleshooting, and security |
-| [Pitfalls](docs/asterisk-notes.md) | What only became apparent with a running Asterisk |
-| [Status and roadmap](docs/roadmap.md) | Verified behavior, limitations, and possible next steps |
+| `shared/` | Topology types, validation, fixtures |
+| `backend/` | REST/WebSocket API, persistence, config generation, AMI, sounds |
+| `frontend/` | Calls editor and runtime-status UI |
+| `asterisk/` | Asterisk image, entrypoint, and static templates |
+| `docs/` | Product strategy, architecture, operations, API, and roadmap |
+| `.agent/` | Durable handoff state and project decisions for coding agents |
 
-Anyone working on Asterisk generation should start with
-[docs/asterisk-notes.md](docs/asterisk-notes.md): it explains which constructs
-load without errors but still do not work.
+## Naming migration
+
+The product and UI now use **Essentials+ Calls**. The GitHub repository must be
+renamed from `visual-pbx` to `calls` in repository settings. Existing internal
+npm package names under `@visual-pbx/*` remain temporarily as implementation
+identifiers and should be migrated in a separate mechanical change together
+with the lockfile and import graph.
