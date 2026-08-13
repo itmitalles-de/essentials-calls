@@ -8,6 +8,7 @@ const TYPE_COLORS: Record<string, string> = {
   ivr: 'var(--node-ivr)',
   ringgroup: 'var(--node-ringgroup)',
   queue: 'var(--node-queue)',
+  schedule: 'var(--node-schedule)',
   voicemail: 'var(--node-voicemail)',
   trunk: 'var(--node-reserved)',
   external: 'var(--node-reserved)',
@@ -29,6 +30,8 @@ function summary(node: PbxNode): string {
       return `${node.properties.strategy} / ${node.properties.ringTimeout}s`;
     case 'queue':
       return `${node.properties.strategy}`;
+    case 'schedule':
+      return `${node.properties.timezone} · ${node.properties.windows.length} Fenster`;
     case 'voicemail':
       return `Mailbox ${node.properties.mailbox}`;
     default:

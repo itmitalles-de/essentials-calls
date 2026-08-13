@@ -2,10 +2,11 @@
 FROM node:20-alpine AS build
 WORKDIR /repo
 COPY package.json ./
+COPY package-lock.json ./
 COPY shared/package.json shared/package.json
 COPY frontend/package.json frontend/package.json
 COPY backend/package.json backend/package.json
-RUN npm install --no-audit --no-fund --workspace=shared --workspace=frontend --include-workspace-root
+RUN npm ci --no-audit --no-fund --workspace=shared --workspace=frontend --include-workspace-root
 COPY shared shared
 COPY frontend frontend
 RUN npm run build -w shared && npm run build -w frontend

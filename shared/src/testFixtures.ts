@@ -1,4 +1,4 @@
-import { ExtensionNode, IVRNode, QueueNode, RingGroupNode, Topology, VoicemailNode } from './types';
+import { ExtensionNode, IVRNode, QueueNode, RingGroupNode, ScheduleNode, Topology, VoicemailNode } from './types';
 
 // Builders used by the shared and backend test suites. Kept in src (not a test
 // folder) so both workspaces can import them through the package entry point.
@@ -57,6 +57,21 @@ export function voicemailNode(id: string, mailbox: string): VoicemailNode {
     label: `VM ${mailbox}`,
     position: { x: 0, y: 0 },
     properties: { mailbox, attachAudio: false },
+  };
+}
+
+export function schedule(id: string, overrides: Partial<ScheduleNode['properties']> = {}): ScheduleNode {
+  return {
+    id,
+    type: 'schedule',
+    label: `Schedule ${id}`,
+    position: { x: 0, y: 0 },
+    properties: {
+      timezone: 'Europe/Berlin',
+      windows: [{ id: 'office', weekdays: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' }],
+      holidays: [],
+      ...overrides,
+    },
   };
 }
 

@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "topology": {
+    "id": "synthetic-acceptance-topology",
+    "name": "Essentials+ Calls synthetic acceptance",
+    "description": "Disposable local callflow; contains no provider, DID or real endpoint data.",
+    "nodes": [
+      {
+        "id": "ext-101",
+        "type": "extension",
+        "label": "Synthetic caller 101",
+        "position": { "x": 80, "y": 80 },
+        "properties": {
+          "number": "101",
+          "sipUser": "101",
+          "sipPassword": "synthetic-101-pass-2026",
+          "callerIdName": "Synthetic Caller",
+          "voicemail": { "enabled": true, "mailbox": "101", "pin": "4101" }
+        }
+      },
+      {
+        "id": "ext-102",
+        "type": "extension",
+        "label": "Synthetic agent 102",
+        "position": { "x": 300, "y": 80 },
+        "properties": {
+          "number": "102",
+          "sipUser": "102",
+          "sipPassword": "synthetic-102-pass-2026",
+          "callerIdName": "Synthetic Agent One",
+          "voicemail": { "enabled": false, "mailbox": "102" }
+        }
+      },
+      {
+        "id": "ext-103",
+        "type": "extension",
+        "label": "Synthetic agent 103",
+        "position": { "x": 520, "y": 80 },
+        "properties": {
+          "number": "103",
+          "sipUser": "103",
+          "sipPassword": "synthetic-103-pass-2026",
+          "callerIdName": "Synthetic Agent Two",
+          "voicemail": { "enabled": false, "mailbox": "103" }
+        }
+      },
+      {
+        "id": "ring-support",
+        "type": "ringgroup",
+        "label": "Synthetic ring group",
+        "position": { "x": 200, "y": 260 },
+        "properties": { "strategy": "ringall", "ringTimeout": 3 }
+      },
+      {
+        "id": "ivr-main",
+        "type": "ivr",
+        "label": "Synthetic IVR",
+        "position": { "x": 420, "y": 260 },
+        "properties": { "greeting": "hello-world", "timeout": 1, "invalidRetries": 1 }
+      },
+      {
+        "id": "vm-fallback",
+        "type": "voicemail",
+        "label": "Synthetic fallback voicemail",
+        "position": { "x": 640, "y": 260 },
+        "properties": { "mailbox": "900", "pin": "4900", "attachAudio": false }
+      },
+      {
+        "id": "queue-support",
+        "type": "queue",
+        "label": "Synthetic support queue",
+        "position": { "x": 260, "y": 440 },
+        "properties": {
+          "strategy": "rrmemory",
+          "timeout": 2,
+          "maxWaitTime": 5,
+          "joinEmpty": "yes",
+          "leaveWhenEmpty": "no"
+        }
+      },
+      {
+        "id": "schedule-office",
+        "type": "schedule",
+        "label": "Synthetic office schedule",
+        "position": { "x": 520, "y": 440 },
+        "properties": {
+          "timezone": "Europe/Berlin",
+          "windows": [
+            {
+              "id": "all-test-days",
+              "weekdays": [1, 2, 3, 4, 5, 6, 7],
+              "start": "00:00",
+              "end": "23:59"
+            }
+          ],
+          "holidays": ["2099-01-01"]
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "ivr-digit-1",
+        "source": "ivr-main",
+        "target": "ring-support",
+        "condition": { "type": "digit", "value": "1" }
+      },
+      {
+        "id": "ivr-digit-2",
+        "source": "ivr-main",
+        "target": "queue-support",
+        "condition": { "type": "digit", "value": "2" }
+      },
+      {
+        "id": "ivr-timeout",
+        "source": "ivr-main",
+        "target": "vm-fallback",
+        "condition": { "type": "timeout" }
+      },
+      {
+        "id": "ivr-invalid",
+        "source": "ivr-main",
+        "target": "ext-103",
+        "condition": { "type": "invalid" }
+      },
+      {
+        "id": "ring-timeout",
+        "source": "ring-support",
+        "target": "vm-fallback",
+        "condition": { "type": "timeout" }
+      },
+      {
+        "id": "queue-timeout",
+        "source": "queue-support",
+        "target": "vm-fallback",
+        "condition": { "type": "timeout" }
+      },
+      {
+        "id": "schedule-open",
+        "source": "schedule-office",
+        "target": "ring-support",
+        "condition": { "type": "open" }
+      },
+      {
+        "id": "schedule-closed",
+        "source": "schedule-office",
+        "target": "vm-fallback",
+        "condition": { "type": "closed" }
+      }
+    ],
+    "memberships": [
+      {
+        "id": "ring-member-102",
+        "groupId": "ring-support",
+        "memberId": "ext-102",
+        "role": "member",
+        "position": 1
+      },
+      {
+        "id": "ring-member-103",
+        "groupId": "ring-support",
+        "memberId": "ext-103",
+        "role": "member",
+        "position": 2
+      },
+      {
+        "id": "queue-agent-102",
+        "groupId": "queue-support",
+        "memberId": "ext-102",
+        "role": "agent",
+        "position": 1
+      },
+      {
+        "id": "queue-agent-103",
+        "groupId": "queue-support",
+        "memberId": "ext-103",
+        "role": "agent",
+        "position": 2
+      }
+    ]
+  }
+}

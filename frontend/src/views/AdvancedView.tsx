@@ -6,12 +6,13 @@ interface AdvancedViewProps {
   topology: Topology;
   setTopology: (updater: (t: Topology) => Topology) => void;
   issues: ValidationIssue[];
+  readOnly?: boolean;
 }
 
 const th: CSSProperties = { textAlign: 'left', fontSize: 11, color: 'var(--fg-muted)', padding: '4px 8px', borderBottom: '1px solid var(--border)' };
 const td: CSSProperties = { padding: '4px 8px', borderBottom: '1px solid var(--border)', fontSize: 12 };
 
-export function AdvancedView({ topology, setTopology, issues }: AdvancedViewProps) {
+export function AdvancedView({ topology, setTopology, issues, readOnly = false }: AdvancedViewProps) {
   const updateNode = (id: string, patch: Partial<PbxNode>) =>
     setTopology((t) => ({ ...t, nodes: t.nodes.map((n) => (n.id === id ? ({ ...n, ...patch } as PbxNode) : n)) }));
   const deleteNode = (id: string) =>
@@ -60,8 +61,9 @@ export function AdvancedView({ topology, setTopology, issues }: AdvancedViewProp
         </div>
       )}
 
+      <fieldset disabled={readOnly} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <h3>Nodes</h3>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
+      <table aria-label="Nodes" style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
         <thead>
           <tr>
             <th style={th}>ID</th>
@@ -108,7 +110,7 @@ export function AdvancedView({ topology, setTopology, issues }: AdvancedViewProp
       </p>
 
       <h3>Edges</h3>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+      <table aria-label="Edges" style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
         <thead>
           <tr>
             <th style={th}>ID</th>
@@ -153,6 +155,8 @@ export function AdvancedView({ topology, setTopology, issues }: AdvancedViewProp
                   <option value="digit">digit</option>
                   <option value="timeout">timeout</option>
                   <option value="invalid">invalid</option>
+                  <option value="open">open</option>
+                  <option value="closed">closed</option>
                 </select>
               </td>
               <td style={td}>
@@ -174,7 +178,7 @@ export function AdvancedView({ topology, setTopology, issues }: AdvancedViewProp
       <button onClick={addEdge}>+ Edge</button>
 
       <h3 style={{ marginTop: 24 }}>Memberships</h3>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+      <table aria-label="Memberships" style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
         <thead>
           <tr>
             <th style={th}>ID</th>
@@ -233,6 +237,7 @@ export function AdvancedView({ topology, setTopology, issues }: AdvancedViewProp
         </tbody>
       </table>
       <button onClick={addMembership}>+ Membership</button>
+      </fieldset>
     </div>
   );
 }

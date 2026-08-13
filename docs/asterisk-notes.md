@@ -1,132 +1,84 @@
-# Fallstricke
+# Asterisk 18 runtime notes
 
-Alles hier ist beim Bauen aufgefallen und wurde gegen einen laufenden
-Asterisk 18 (Ubuntu 22.04) geprüft — nicht aus der Dokumentation abgeleitet.
-Gemeinsames Muster: Die Konfiguration lädt fehlerfrei, und der Fehler zeigt
-sich erst im Anruf.
+These constraints were exercised in the disposable Asterisk container. A
+configuration loading without an error is not sufficient evidence; the
+acceptance suite also registers endpoints, places calls, observes AMI/CDR, and
+checks post-reload behavior.
 
-## Endpoints heißen wie der SIP-User, nicht wie der Node
+## Endpoint identity and re-registration
 
-```
-NOTICE res_pjsip/pjsip_distributor.c: Request 'REGISTER' from '<sip:101@…>'
-       failed for '…' - No matching endpoint found
-```
+A PJSIP endpoint must be named after the SIP user. Merely placing
+`username=101` in an auth section does not let an endpoint named
+`ext_101` match a REGISTER. `remove_existing=yes` is also necessary with
+`max_contacts=1`, otherwise a client restarting on a new source port is
+rejected until the former contact expires.
 
-Asterisk ordnet eine eingehende Anfrage über den **Endpoint-Namen** zu;
-`identify_by` steht per Default auf `username,ip`. Ein Endpoint namens
-`ext_101` wird von einem Telefon, das sich als `101` anmeldet, nie gefunden —
-auch dann nicht, wenn `username=101` im Auth-Abschnitt steht.
+## No plaintext password in generated PJSIP
 
-`identify_by=auth_username` löst es nicht. Der zuverlässige Weg ist, den
-Abschnitt nach dem SIP-User zu benennen. Deshalb verlangt der Validator einen
-eindeutigen `sipUser`.
+The pinned Asterisk 18 supports legacy `auth_type=md5` and `md5_cred`, but
+not the newer `password_digest` introduced in later supported branches. The
+realm must exactly match the realm used for HA1 calculation. The implementation
+fixes both to `asterisk` and the SIPp acceptance confirms REGISTER and INVITE
+authentication still work.
 
-Tückisch daran: `pjsip show endpoints` listet die Objekte sauber auf. Dass
-sich nichts registrieren kann, sieht man erst beim Versuch.
+This MD5 usage is dictated by Asterisk 18 digest compatibility; it does not
+justify MD5 for application password hashing. Application users use scrypt,
+and source SIP passwords remain AES-256-GCM encrypted.
 
-## `max_contacts=1` sperrt neu startende Telefone aus
+## IVR control flow
 
-```
-WARNING res_pjsip_registrar.c: Registration attempt from endpoint '101'
-        to AOR '101' will exceed max contacts of 1
-```
+Asterisk does not implement shell `${VAR:-default}` semantics. Retry
+arithmetic uses an initialized variable and a `0` prefix. Re-prompting jumps
+to a label after initialization; returning to priority 1 would reset the count
+and permit an endless invalid-input loop.
 
-Ein Telefon, das neu startet, meldet sich von einem neuen Quellport. Ohne
-Ersetzungsregel gilt das als zusätzlicher Kontakt und wird mit `403` abgelehnt,
-bis die alte Registrierung abläuft. Behoben mit `remove_existing=yes` am AOR.
+## Voicemail modules
 
-## Ubuntu lädt das falsche Voicemail-Modul
+The Ubuntu package ships mutually exclusive ODBC, IMAP, and file-backed
+voicemail modules. The image explicitly disables ODBC/IMAP so
+`app_voicemail.so` handles stored messages. Listing mailboxes alone did not
+prove message storage; the synthetic flow exercises the application.
 
-```
-ERROR loader.c: app_voicemail declined to load.
-WARNING app_voicemail_odbc.c: Failed to obtain database object for 'asterisk'!
-```
+## Queue details
 
-Das Paket bringt drei sich ausschließende Voicemail-Backends mit; wer zuerst
-lädt, gewinnt. Gewonnen hatte `app_voicemail_odbc`, das eine ODBC-Datenbank
-braucht und bei jeder Nachricht scheitert.
+Asterisk removed queue strategy `roundrobin`; `rrmemory` is the compatible
+replacement. `queues.conf timeout` is per-member ring time, while the fifth
+`Queue()` argument is the caller's total wait limit. Queue reload must be
+tested while its runtime exists, not inferred from a successful file parse.
 
-Besonders irreführend: `voicemail show users` listete die Mailboxen korrekt auf.
-Nur speichern konnte es nichts. `modules.conf` blockiert jetzt die ODBC- und
-IMAP-Varianten.
+## Sounds
 
-## Asterisk kennt kein `${VAR:-default}`
+On Ubuntu, the custom sound lookup resolves through
+`/usr/share/asterisk/sounds/custom` to the shared local sounds directory.
+Asterisk-compatible uploads are PCM, mono, 16-bit, and 8 or 16 kHz. The backend
+validates this before an atomic file replacement, and deploy validation checks
+that every IVR reference exists.
 
-`${VAR:-0}` ist keine Shell-Ersetzung, sondern Substring-Syntax, und liefert
-einen leeren String. Aus `$[${RETRY:-0} + 1]` wird `$[ + 1]`:
+## Isolated preflight
 
-```
-WARNING ast_expr2.fl: ast_yyerror(): syntax error, unexpected '+', expecting $end
-```
+The running Asterisk process cannot safely prove a candidate before it becomes
+active. A private shared-volume handshake starts a second process with isolated
+run/log/spool/database paths and candidate includes. It verifies both process
+readiness and required objects, then removes the work tree. This is more than a
+text syntax scan but still only validates the pinned container.
 
-Gelöst durch Initialisieren beim Eintritt plus `0`-Präfix im Ausdruck
-(`$[0${RETRY} + 1]`), das auch bei ungesetzter Variable gültig bleibt.
+## Runtime canary and rollback
 
-## Erneuter IVR-Prompt darf nicht auf Priorität 1 springen
+Reload commands may return successfully while the desired objects are absent.
+Each deployment therefore carries a unique dialplan canary and an expected
+endpoint count. A missing canary or endpoints makes the deploy fail and invokes
+last-known-good rollback.
 
-Ein `Goto(ivr_x,s,1)` nach einer Fehleingabe läuft erneut über
-`Set(RETRY=0)` — der Zähler wird zurückgesetzt und die Schleife endet nie.
-Der Sprung geht deshalb auf das Label `(menu)` hinter der Initialisierung.
+## Useful evidence
 
-## Endpoints erreichen nur ihren eigenen Kontext
+The full-stack suite inspects `pjsip show contacts`, dialplan canaries, queue
+events, and AMI `Cdr` events. CDR and event paths are more useful than
+startup logs for determining which application a synthetic call actually
+reached.
 
-Endpoints registrieren in `internal`. Ein zweiter Kontext `entrypoints` ist von
-dort **nicht** wählbar, solange kein `include => entrypoints` in `internal`
-steht. Ohne das waren die dokumentierten Testnummern schlicht tot, obwohl
-`dialplan show entrypoints` sie korrekt anzeigte.
+## Non-Asterisk editor note
 
-## `roundrobin` gibt es in Queues nicht mehr
-
-Die Strategie wurde in Asterisk 12 entfernt. `app_queue` fällt still auf
-`ringall` zurück. Der Generator übersetzt nach `rrmemory`.
-
-## Queue-Wartezeit steht nicht in `queues.conf`
-
-`timeout` dort ist die Klingeldauer **pro Agent**. Die maximale Gesamtwartezeit
-ist das fünfte Argument der Applikation: `Queue(name,,,,120)`. Wer nur
-`queues.conf` setzt, wundert sich über Anrufer, die ewig warten.
-
-## Eigene Ansagen liegen woanders, als man denkt
-
-Auf Debian/Ubuntu ist `/usr/share/asterisk/sounds/custom` ein Symlink nach
-`/usr/local/share/asterisk/sounds`. Dateien dort sind als `custom/<name>`
-abspielbar.
-
-`format_wav` verlangt PCM, Mono, 16 Bit, 8 oder 16 kHz. Eine Stereo- oder
-44,1-kHz-Datei wird klaglos gespeichert und scheitert erst im Anruf — deshalb
-prüft das Backend den RIFF-Header beim Upload.
-
-Prompt-Namen ohne Endung angeben: Asterisk sucht das passende Format selbst.
-`welcome` existiert übrigens nicht in den Core-Sounds, `hello-world` schon.
-
-## Debian bookworm hat kein Asterisk-Paket
-
-`E: Package 'asterisk' has no installation candidate`. Das Image basiert
-deshalb auf Ubuntu 22.04, dessen `universe` Asterisk 18.10 mitbringt.
-
-## Nützlich beim Prüfen
-
-Das Messages-Log enthält nur notice/warning/error. Was ein Anruf tatsächlich
-durchlaufen hat, steht im CDR:
-
-```bash
-docker compose exec asterisk asterisk -rx "channel originate Local/603@internal application Wait 6"
-docker compose exec asterisk cat /var/log/asterisk/cdr-csv/Master.csv | tail -2
-```
-
-Die Spalten für Kontext und letzte Applikation zeigen, wo der Anruf gelandet
-ist — deutlich verlässlicher als zu prüfen, ob die Config „geladen aussieht".
-
----
-
-## Nicht Asterisk: React Flow verliert Kanten
-
-Wird das `nodes`-Array bei jedem Render neu aus dem State aufgebaut, verliert
-React Flow seine per ResizeObserver gemessenen Node-Größen. Ohne die kann es
-keine Kanten berechnen und rendert **stillschweigend gar keine** — keine
-Warnung, keine Fehlermeldung, die Kanten sind einfach weg.
-
-Der Editor hält die Liste deshalb über `useNodesState` und merged Änderungen
-aus der Topologie hinein, statt sie neu abzuleiten. Aus demselben Grund werden
-Löschungen aus React Flow zurück in die Topologie gespiegelt — sonst setzt der
-Sync-Effekt den Node sofort wieder ein und das Löschen wirkt folgenlos.
+React Flow needs stable measured node objects. The graph keeps React Flow state
+and merges topology changes rather than rebuilding nodes on each render;
+otherwise edges can disappear without an exception. Selection and viewport
+changes stay outside topology history.

@@ -24,6 +24,11 @@ interface SimpleViewProps {
   selectedNodeId?: string;
   selectedEdgeId?: string;
   onSelect: (sel: { nodeId?: string; edgeId?: string }) => void;
+  canEdit: boolean;
+  canManageSecrets: boolean;
+  revision: number;
+  onSecretChange: (nodeId: string, secret: string) => Promise<void>;
+  onServerTopologyChanged: () => Promise<void>;
 }
 
 const NODE_MINIMAP_COLORS: Record<string, string> = {
@@ -31,6 +36,7 @@ const NODE_MINIMAP_COLORS: Record<string, string> = {
   ivr: 'var(--node-ivr)',
   ringgroup: 'var(--node-ringgroup)',
   queue: 'var(--node-queue)',
+  schedule: 'var(--node-schedule)',
   voicemail: 'var(--node-voicemail)',
 };
 
@@ -39,10 +45,24 @@ const PALETTE: { type: Exclude<NodeType, 'trunk' | 'external'>; label: string }[
   { type: 'ivr', label: '+ IVR' },
   { type: 'ringgroup', label: '+ Ring Group' },
   { type: 'queue', label: '+ Queue' },
+  { type: 'schedule', label: '+ Zeitplan' },
   { type: 'voicemail', label: '+ Voicemail' },
 ];
 
-export function SimpleView({ topology, setTopology, statuses, issues, selectedNodeId, selectedEdgeId, onSelect }: SimpleViewProps) {
+export function SimpleView({
+  topology,
+  setTopology,
+  statuses,
+  issues,
+  selectedNodeId,
+  selectedEdgeId,
+  onSelect,
+  canEdit,
+  canManageSecrets,
+  revision,
+  onSecretChange,
+  onServerTopologyChanged,
+}: SimpleViewProps) {
   const invalidNodeIds = useMemo(() => new Set(issues.filter((i) => i.nodeId).map((i) => i.nodeId!)), [issues]);
   const invalidEdgeIds = useMemo(() => new Set(issues.filter((i) => i.edgeId).map((i) => i.edgeId!)), [issues]);
 
@@ -77,6 +97,7 @@ export function SimpleView({ topology, setTopology, statuses, issues, selectedNo
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
+      if (!canEdit) return;
       onNodesChangeInternal(changes);
 
       const moved = changes.filter(
@@ -107,16 +128,17 @@ export function SimpleView({ topology, setTopology, statuses, issues, selectedNo
         };
       });
     },
-    [onNodesChangeInternal, setTopology]
+    [canEdit, onNodesChangeInternal, setTopology]
   );
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
+      if (!canEdit) return;
       const removedIds = new Set(changes.filter((c) => c.type === 'remove').map((c) => c.id));
       if (removedIds.size === 0) return;
       setTopology((t) => ({ ...t, edges: t.edges.filter((e) => !removedIds.has(e.id)) }));
     },
-    [setTopology]
+    [canEdit, setTopology]
   );
 
   const rfEdges: RFEdge[] = topology.edges.map((e) => ({
@@ -131,6 +153,7 @@ export function SimpleView({ topology, setTopology, statuses, issues, selectedNo
 
   const onConnect = useCallback(
     (connection: Connection) => {
+      if (!canEdit) return;
       if (!connection.source || !connection.target) return;
       const sourceNode = topology.nodes.find((n) => n.id === connection.source);
       const targetNode = topology.nodes.find((n) => n.id === connection.target);
@@ -147,10 +170,11 @@ export function SimpleView({ topology, setTopology, statuses, issues, selectedNo
       };
       setTopology((t) => ({ ...t, edges: [...t.edges, edge] }));
     },
-    [topology.nodes, setTopology]
+    [canEdit, topology.nodes, setTopology]
   );
 
   const addNode = (type: Exclude<NodeType, 'trunk' | 'external'>) => {
+    if (!canEdit) return;
     const node: PbxNode = createDefaultNode(type, { x: 80 + Math.random() * 400, y: 80 + Math.random() * 300 });
     setTopology((t) => ({ ...t, nodes: [...t.nodes, node] }));
     onSelect({ nodeId: node.id });
@@ -177,11 +201,11 @@ export function SimpleView({ topology, setTopology, statuses, issues, selectedNo
     });
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
+    <div aria-label="Callflow-Graph" style={{ display: 'flex', height: '100%' }}>
       <div style={{ flex: 1, position: 'relative' }}>
         <div style={{ position: 'absolute', zIndex: 10, top: 8, left: 8, display: 'flex', gap: 6 }}>
           {PALETTE.map((p) => (
-            <button key={p.type} onClick={() => addNode(p.type)}>
+            <button key={p.type} onClick={() => addNode(p.type)} disabled={!canEdit}>
               {p.label}
             </button>
           ))}
@@ -196,6 +220,11 @@ export function SimpleView({ topology, setTopology, statuses, issues, selectedNo
           onNodeClick={(_, n) => onSelect({ nodeId: n.id })}
           onEdgeClick={(_, e) => onSelect({ edgeId: e.id })}
           onPaneClick={() => onSelect({})}
+          nodesDraggable={canEdit}
+          nodesConnectable={canEdit}
+          nodesFocusable
+          edgesFocusable
+          deleteKeyCode={canEdit ? ['Backspace', 'Delete'] : null}
           fitView
         >
           {/* These take colours as props, not CSS, so they are read from the
@@ -218,6 +247,11 @@ export function SimpleView({ topology, setTopology, statuses, issues, selectedNo
           onUpdateEdge={updateEdge}
           onDeleteEdge={deleteEdge}
           onToggleMembership={toggleMembership}
+          readOnly={!canEdit}
+          canManageSecrets={canManageSecrets}
+          revision={revision}
+          onSecretChange={onSecretChange}
+          onServerTopologyChanged={onServerTopologyChanged}
         />
       </div>
     </div>

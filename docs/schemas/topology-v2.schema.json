@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://itmitalles.de/schemas/essentials-calls/topology-v2.schema.json",
+  "title": "Essentials+ Calls topology export v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "product", "exportedAt", "redacted", "topology"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "product": { "const": "Essentials+ Calls" },
+    "exportedAt": { "type": "string", "format": "date-time" },
+    "redacted": { "const": true },
+    "topology": { "$ref": "#/$defs/topology" }
+  },
+  "$defs": {
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" } }
+    },
+    "baseNode": {
+      "type": "object",
+      "required": ["id", "type", "label", "properties"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "type": { "enum": ["extension", "ivr", "ringgroup", "queue", "schedule", "voicemail"] },
+        "label": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "position": { "$ref": "#/$defs/position" },
+        "metadata": { "type": "object" }
+      }
+    },
+    "extension": {
+      "allOf": [
+        { "$ref": "#/$defs/baseNode" },
+        {
+          "properties": {
+            "type": { "const": "extension" },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["number", "sipUser", "sipSecret"],
+              "properties": {
+                "number": { "type": "string", "pattern": "^[0-9]+$" },
+                "sipUser": { "type": "string", "minLength": 1 },
+                "sipSecret": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["configured"],
+                  "properties": { "configured": { "type": "boolean" } }
+                },
+                "callerIdName": { "type": "string" },
+                "voicemail": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["enabled", "mailbox"],
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "mailbox": { "type": "string" },
+                    "pin": { "type": "string" },
+                    "email": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ivr": {
+      "allOf": [
+        { "$ref": "#/$defs/baseNode" },
+        {
+          "properties": {
+            "type": { "const": "ivr" },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["greeting", "timeout", "invalidRetries"],
+              "properties": {
+                "greeting": { "type": "string", "minLength": 1 },
+                "timeout": { "type": "number", "minimum": 1 },
+                "invalidRetries": { "type": "integer", "minimum": 1 }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ringgroup": {
+      "allOf": [
+        { "$ref": "#/$defs/baseNode" },
+        {
+          "properties": {
+            "type": { "const": "ringgroup" },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["strategy", "ringTimeout"],
+              "properties": {
+                "strategy": { "enum": ["ringall", "roundrobin", "leastrecent", "fewestcalls", "random"] },
+                "ringTimeout": { "type": "number", "minimum": 1 }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "queue": {
+      "allOf": [
+        { "$ref": "#/$defs/baseNode" },
+        {
+          "properties": {
+            "type": { "const": "queue" },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["strategy", "timeout", "maxWaitTime", "joinEmpty", "leaveWhenEmpty"],
+              "properties": {
+                "strategy": { "enum": ["ringall", "roundrobin", "leastrecent", "fewestcalls", "random", "rrmemory"] },
+                "timeout": { "type": "number", "minimum": 1 },
+                "maxWaitTime": { "type": "number", "minimum": 1 },
+                "joinEmpty": { "enum": ["yes", "no", "strict"] },
+                "leaveWhenEmpty": { "enum": ["yes", "no"] }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "schedule": {
+      "allOf": [
+        { "$ref": "#/$defs/baseNode" },
+        {
+          "properties": {
+            "type": { "const": "schedule" },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["timezone", "windows", "holidays"],
+              "properties": {
+                "timezone": { "type": "string", "minLength": 1 },
+                "windows": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["id", "weekdays", "start", "end"],
+                    "properties": {
+                      "id": { "type": "string", "minLength": 1 },
+                      "weekdays": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "integer", "minimum": 1, "maximum": 7 } },
+                      "start": { "type": "string", "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$" },
+                      "end": { "type": "string", "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$" }
+                    }
+                  }
+                },
+                "holidays": { "type": "array", "uniqueItems": true, "items": { "type": "string", "format": "date" } }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "voicemail": {
+      "allOf": [
+        { "$ref": "#/$defs/baseNode" },
+        {
+          "properties": {
+            "type": { "const": "voicemail" },
+            "properties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mailbox", "attachAudio"],
+              "properties": {
+                "mailbox": { "type": "string", "minLength": 1 },
+                "pin": { "type": "string" },
+                "email": { "type": "string" },
+                "attachAudio": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "target"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "target": { "type": "string", "minLength": 1 },
+        "condition": {
+          "oneOf": [
+            { "type": "object", "additionalProperties": false, "required": ["type", "value"], "properties": { "type": { "const": "digit" }, "value": { "type": "string", "pattern": "^[0-9*#]$" } } },
+            { "type": "object", "additionalProperties": false, "required": ["type"], "properties": { "type": { "enum": ["timeout", "invalid", "open", "closed", "unconditional"] } } }
+          ]
+        }
+      }
+    },
+    "membership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "groupId", "memberId", "role"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "groupId": { "type": "string", "minLength": 1 },
+        "memberId": { "type": "string", "minLength": 1 },
+        "role": { "enum": ["member", "agent"] },
+        "position": { "type": "integer" },
+        "paused": { "type": "boolean" }
+      }
+    },
+    "topology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "nodes", "edges", "memberships"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "nodes": { "type": "array", "items": { "oneOf": [{ "$ref": "#/$defs/extension" }, { "$ref": "#/$defs/ivr" }, { "$ref": "#/$defs/ringgroup" }, { "$ref": "#/$defs/queue" }, { "$ref": "#/$defs/schedule" }, { "$ref": "#/$defs/voicemail" }] } },
+        "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+        "memberships": { "type": "array", "items": { "$ref": "#/$defs/membership" } }
+      }
+    }
+  }
+}

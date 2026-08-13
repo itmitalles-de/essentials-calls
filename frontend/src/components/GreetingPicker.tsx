@@ -1,26 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { deleteSound, fetchSounds, SoundInfo, soundUrl, uploadSound } from '../api/client';
+import { BUILTIN_PROMPTS } from '@visual-pbx/shared';
+import { ApiError, deleteSound, fetchSounds, SoundInfo, soundUrl, uploadSound } from '../api/client';
 import { isRecordingSupported, MicRecorder, toAsteriskWav } from '../audio';
 
 /**
  * Prompts that ship with Asterisk's core sounds package, so the field is usable
  * before anything has been uploaded.
  */
-const BUILTIN_PROMPTS = ['hello-world', 'demo-thanks', 'demo-congrats', 'pls-hold-while-try', 'invalid'];
-
 interface GreetingPickerProps {
   value: string;
   onChange: (greeting: string) => void;
   /** Used to pre-fill the name of a new recording. */
   suggestedName: string;
+  disabled?: boolean;
+  revision: number;
+  onServerTopologyChanged: () => Promise<void>;
 }
 
 type Busy = null | { kind: 'recording' } | { kind: 'working'; label: string };
 
-export function GreetingPicker({ value, onChange, suggestedName }: GreetingPickerProps) {
+export function GreetingPicker({ value, onChange, suggestedName, disabled = false, revision, onServerTopologyChanged }: GreetingPickerProps) {
   const [sounds, setSounds] = useState<SoundInfo[]>([]);
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
+  const [replacement, setReplacement] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
   const recorder = useRef<MicRecorder | null>(null);
 
@@ -44,6 +47,7 @@ export function GreetingPicker({ value, onChange, suggestedName }: GreetingPicke
       const sound = await uploadSound(rawName, wav);
       onChange(sound.reference);
       reload();
+      window.dispatchEvent(new Event('essentials-calls:sounds-changed'));
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -83,18 +87,31 @@ export function GreetingPicker({ value, onChange, suggestedName }: GreetingPicke
   };
 
   const removeSound = async (name: string) => {
-    await deleteSound(name);
-    reload();
+    setError(null);
+    try {
+      const result = await deleteSound(name, replacement || undefined, replacement ? revision : undefined);
+      if (result.revision !== undefined) await onServerTopologyChanged();
+      reload();
+      window.dispatchEvent(new Event('essentials-calls:sounds-changed'));
+    } catch (failure) {
+      if (failure instanceof ApiError && failure.status === 409) {
+        const references = (failure.body.references as Array<{ label: string }> | undefined) ?? [];
+        setError(`Ansage wird verwendet von: ${references.map((entry) => entry.label).join(', ') || 'unbekannt'}. Ersatz wählen oder Referenz ändern.`);
+      } else {
+        setError((failure as Error).message);
+      }
+    }
   };
 
   const custom = value.startsWith('custom/') ? value.slice('custom/'.length) : null;
-  const known = BUILTIN_PROMPTS.includes(value) || sounds.some((s) => s.reference === value);
+  const known = BUILTIN_PROMPTS.has(value) || sounds.some((s) => s.reference === value);
+  const selectedSound = custom ? sounds.find((sound) => sound.name === custom) : undefined;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
       <label style={{ fontSize: 11, color: 'var(--fg-muted)' }}>Begrüßung</label>
 
-      <select value={known ? value : '__custom__'} onChange={(e) => onChange(e.target.value)}>
+      <select aria-label="Begrüßung auswählen" value={known ? value : '__custom__'} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
         <optgroup label="Eigene Aufnahmen">
           {sounds.length === 0 && <option disabled>— noch keine —</option>}
           {sounds.map((s) => (
@@ -104,7 +121,7 @@ export function GreetingPicker({ value, onChange, suggestedName }: GreetingPicke
           ))}
         </optgroup>
         <optgroup label="Mitgelieferte Ansagen">
-          {BUILTIN_PROMPTS.map((p) => (
+          {[...BUILTIN_PROMPTS].map((p) => (
             <option key={p} value={p}>
               {p}
             </option>
@@ -114,14 +131,16 @@ export function GreetingPicker({ value, onChange, suggestedName }: GreetingPicke
       </select>
 
       <input
+        aria-label="Begrüßungsreferenz"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Dateiname ohne Endung"
         title="Wird von Asterisk unter /usr/share/asterisk/sounds/ aufgelöst"
+        disabled={disabled}
       />
 
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        <button onClick={() => fileInput.current?.click()} disabled={busy !== null}>
+        <button onClick={() => fileInput.current?.click()} disabled={disabled || busy !== null}>
           Datei wählen
         </button>
 
@@ -131,7 +150,7 @@ export function GreetingPicker({ value, onChange, suggestedName }: GreetingPicke
               ⏹ Aufnahme stoppen
             </button>
           ) : (
-            <button onClick={startRecording} disabled={busy !== null}>
+            <button onClick={startRecording} disabled={disabled || busy !== null}>
               ● Aufnehmen
             </button>
           ))}
@@ -147,13 +166,28 @@ export function GreetingPicker({ value, onChange, suggestedName }: GreetingPicke
         )}
 
         {custom && sounds.some((s) => s.name === custom) && (
-          <button onClick={() => removeSound(custom)} disabled={busy !== null} style={{ color: 'var(--danger)' }}>
+          <button onClick={() => removeSound(custom)} disabled={disabled || busy !== null} style={{ color: 'var(--danger)' }}>
             Löschen
           </button>
         )}
       </div>
 
+      {selectedSound && selectedSound.references.length > 0 && (
+        <div className="sound-references">
+          Referenziert von: {selectedSound.references.map((reference) => reference.label).join(', ')}
+          <label>
+            Ersatz vor Löschen
+            <select value={replacement} onChange={(event) => setReplacement(event.target.value)} disabled={disabled}>
+              <option value="">— keinen —</option>
+              {[...BUILTIN_PROMPTS].filter((entry) => entry !== value).map((entry) => <option key={entry} value={entry}>{entry}</option>)}
+              {sounds.filter((entry) => entry.reference !== value).map((entry) => <option key={entry.reference} value={entry.reference}>{entry.name}</option>)}
+            </select>
+          </label>
+        </div>
+      )}
+
       <input
+        aria-label="Ansagedatei hochladen"
         ref={fileInput}
         type="file"
         accept="audio/*"

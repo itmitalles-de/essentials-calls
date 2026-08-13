@@ -1,103 +1,128 @@
-# Architektur
+# Architecture
 
-## Komponenten
+## Product and repository boundary
 
-```
-┌─────────────────┐     HTTP/WS      ┌──────────────────┐      AMI (TCP 5038)   ┌────────────┐
-│ frontend        │ ───────────────▶ │ backend          │ ────────────────────▶ │ asterisk   │
-│ nginx + React   │ ◀─────────────── │ Node/Express     │ ◀──────────────────── │ Asterisk 18│
-│ :8080           │   Status-Push    │ :4000            │   Endpoint-/Queue-    │ :5060 SIP  │
-└─────────────────┘                  └──────────────────┘   Status              └────────────┘
-                                            │                                          ▲
-                                            │  schreibt Dateien                        │ liest
-                                            ▼                                          │
-                                     ┌──────────────────────────────────────────────────┐
-                                     │ Volumes: asterisk-generated, asterisk-sounds     │
-                                     └──────────────────────────────────────────────────┘
-```
+The visible product is **Essentials+ Calls**. The repository, npm namespace,
+default branch, and Asterisk 18 base remain the independent `visual-pbx`
+technical implementation. There is no shared Essentials+ Office database or
+copied Office component.
 
-Das Backend redet mit Asterisk auf zwei Wegen: Konfiguration wird als Datei in
-ein geteiltes Volume geschrieben, der Reload und die Statusabfragen laufen über
-AMI. Beides ist nötig — AMI kann keine Config-Dateien schreiben, und ohne Reload
-liest Asterisk neue Dateien nicht.
+## Runtime components
 
-## Workspaces
-
-| Workspace | Rolle |
-|---|---|
-| `shared/` | Domain-Modell und Validator. Wird von Backend **und** Frontend importiert, damit die Validierung an beiden Enden identisch ist. |
-| `backend/` | Express-API, Config-Generator, AMI-Client, Sound-Ablage. |
-| `frontend/` | React-Editor, Vite-Build, ausgeliefert von nginx. |
-| `asterisk/` | Image mit Asterisk 18 und statischen Basis-Configs. |
-
-`shared` ist der Grund für das Monorepo: Ein Validierungsfehler soll im Editor
-sofort sichtbar sein, aber das Backend darf sich nicht darauf verlassen, dass
-der Client geprüft hat. Eine gemeinsame Implementierung verhindert, dass beide
-Seiten auseinanderlaufen.
-
-### Ein Detail beim Build
-
-Das Frontend importiert `shared` über einen Vite-Alias direkt aus dem
-TypeScript-Quellcode, das Backend aus dem kompilierten `dist/`. Grund: `tsc`
-erzeugt einen CommonJS-Barrel mit dynamischer `__exportStar`-Schleife, die
-Rollup beim Produktionsbuild nicht statisch analysieren kann — der Build bricht
-mit „is not exported by" ab. Siehe Kommentar in `frontend/vite.config.ts`.
-
-## Datenfluss beim Deploy
-
-```
-Editor ──▶ PUT/POST /api/deploy
-              │
-              ├─ 1. Struktur prüfen  (validateTopologyShape)
-              ├─ 2. Regeln prüfen    (validateTopology) ──▶ Fehler? 400, Ende
-              ├─ 3. Topologie sichern (topology.json)
-              ├─ 4. Config erzeugen  (generateAll) ──▶ /shared-config/*.conf
-              └─ 5. AMI-Reload       (dialplan, pjsip, queue, voicemail)
+```text
+Headless/browser client
+        | HTTPS-ready HTTP + authenticated WebSocket
+        v
+nginx + React :8080  ---->  Express :4000  ----> SQLite WAL (/data)
+                                  |  |
+                shared volumes <--+  +--> long-lived AMI :5038
+                     |                       |
+                     v                       v
+           generated config/sounds <---- Asterisk 18 :5060/RTP
+                                               ^
+                                               |
+                                      SIPp synthetic clients
 ```
 
-Schritt 1 und 2 sind bewusst getrennt: Die API nimmt beliebiges JSON entgegen,
-also muss die Form bewiesen sein, bevor Regeln auf Felder zugreifen. Ohne diese
-Trennung riss ein fehlerhafter Request den ganzen Prozess ab.
+Published Compose ports bind to `127.0.0.1` by default. nginx proxies API and
+WebSocket traffic inside the Compose network. AMI and the backend are not
+needed on a public host interface.
 
-Schritt 4 schreibt vier Dateien, die per `#include` aus den statischen
-Basis-Configs im Asterisk-Image gezogen werden. Handgeschriebenes (Transport,
-Logger, Codecs) bleibt so unangetastet.
+## Source boundaries
 
-## Persistenz
+| Area | Responsibility |
+| --- | --- |
+| `shared/` | Topology types, v2 format/migration/redaction, schedule evaluator, shape and semantic validation |
+| `backend/src/model/` | SQLite schema, legacy migration, revisions, users, sessions, encrypted secrets, audit |
+| `backend/src/security/` | scrypt passwords, AES-GCM key loading, session/CSRF/RBAC |
+| `backend/src/asterisk/` | config generator, staged deploy, AMI client/event status, WAV storage |
+| `backend/src/backup/` and `cli/` | checksummed backup, empty restore, bootstrap, key rotation |
+| `frontend/` | graph/table editor, bounded history, import/export, sounds, revisions, role-aware controls |
+| `asterisk/` | pinned Asterisk 18 base config and isolated preflight worker |
+| `tests/` and `scripts/` | disposable SIPp/AMI/CDR, Playwright, and restore acceptance |
 
-| Volume | Inhalt |
-|---|---|
-| `pbx-data` | `topology.json` — die einzige Quelle der Wahrheit für den Callflow |
-| `asterisk-generated` | die vier generierten `*_generated.conf` |
-| `asterisk-sounds` | hochgeladene IVR-Ansagen als WAV |
+The shared validator gives immediate client feedback, but the backend always
+revalidates untrusted data with the current server-side sound inventory.
 
-Die Topologie ist eine einzelne JSON-Datei ohne Locking. Für einen PoC mit einem
-Bearbeiter ist das ausreichend; zwei gleichzeitige Speichervorgänge würden sich
-gegenseitig überschreiben.
+## Persistence model
 
-## Statusmodell
+`pbx-data/essentials-calls.sqlite3` is the authoritative store:
 
-Der Status ist bewusst **nicht** Teil der Topologie und wird nicht persistiert.
-Das Backend fragt alle 3 Sekunden per AMI `PJSIPShowEndpoints` und `QueueStatus`
-ab und schiebt das Ergebnis über WebSocket an alle offenen Editoren.
+- users, scrypt hashes, sessions, and login-rate state;
+- immutable, redacted topology revisions and current/active/last-good pointers;
+- AES-256-GCM SIP-secret rows keyed by extension ID;
+- deployments and redacted audit events.
 
-Ist Asterisk nicht erreichbar, liefert die Abfrage für jeden Node `unknown`
-statt einen Fehler zu werfen — der Editor bleibt bedienbar, auch wenn die
-Telefonanlage gerade neu startet.
+SQLite uses WAL, foreign keys, a busy timeout, and transactions. On first start
+only, an existing `topology.json` is copied byte-for-byte to the mode-`0600`
+`topology.json.pre-sqlite-migration`, migrated, redacted in revision history,
+and the original plaintext source is removed only after the SQLite transaction
+commits. The preserved byte-identical copy is an explicit migration artifact,
+must be handled as sensitive, and is excluded from normal exports and backups.
+All active credential rows are encrypted.
 
-## Frontend-Aufbau
+Custom sounds and generated Asterisk versions remain separate named volumes.
+Generated files are derivatives. PJSIP files contain an Asterisk 18 HA1
+credential, not the source password.
 
-```
-App.tsx                 Shell: Tabs, Speichern/Deploy, Theme-Toggle, Statusverteilung
-├── views/SimpleView    React-Flow-Graph + Inspector
-│   ├── components/PbxNodeView     Node-Darstellung inkl. Statuspunkt
-│   ├── components/Inspector       typspezifische Formulare
-│   └── components/GreetingPicker  Ansage aufnehmen/hochladen
-├── views/AdvancedView  Tabellen für Nodes, Edges, Memberships + Fehlerliste
-├── theme.ts            Hell/Dunkel/System mit Persistenz
-└── audio.ts            Konvertierung nach 8 kHz Mono WAV im Browser
-```
+## Revision and editing flow
 
-Die Audiokonvertierung läuft absichtlich im Browser (Web Audio API): Das spart
-ffmpeg im Backend-Image, und Aufnahme (webm/opus) wie Upload (mp3, m4a, ogg,
-wav) gehen durch denselben Pfad.
+Every save creates a monotonic immutable revision with actor, time, comment,
+source, and a readable summary. API reads return an ETag. Mutations require
+`If-Match`; a stale client receives HTTP 409 and cannot overwrite newer work.
+A rollback reads an old immutable revision and writes it forward as a new
+revision. Current, active, and last-known-good revisions are protected from
+retention pruning.
+
+The frontend's bounded history tracks node, edge, membership, and property
+changes. Selection and viewport moves do not create history. Loading/importing/
+rolling back resets history; saving updates the saved baseline without erasing
+valid undo state.
+
+## Atomic deploy protocol
+
+1. Prove topology shape.
+2. Validate semantic rules and the current sound inventory.
+3. Materialize SIP secrets transiently.
+4. Generate all files in a private staging directory.
+5. Reject unsafe generated text and excessive output.
+6. Ask an isolated Asterisk 18 process in the container to load the candidate.
+7. Rename staging to an immutable version directory.
+8. atomically switch the `current` symlink.
+9. run targeted dialplan/PJSIP/queue/voicemail reloads through AMI.
+10. verify Asterisk version, dialplan, deployment canary, and endpoint count.
+11. atomically update `last-good` and the active revision, then audit success.
+
+Any failure before activation leaves `current` unchanged. A reload or runtime
+failure after activation switches back to the previous target, reloads it,
+checks that runtime, and records whether rollback succeeded. A successful file
+write alone is never reported as a successful deploy.
+
+## Runtime status
+
+`AmiStatusService` maintains one long-lived AMI event connection and handles
+endpoint/contact, channel state, bridge, hangup, queue caller, and queue member
+events. It:
+
+- deduplicates event identities for a bounded interval;
+- heartbeats with AMI Ping;
+- reconnects with exponential backoff;
+- publishes `connected`, `reconnecting`, or `degraded`;
+- refreshes endpoint/queue snapshots after reconnect; and
+- retains a slow polling snapshot as fallback.
+
+Transient status never enters a topology revision. Authenticated WebSocket
+clients receive snapshots and changes.
+
+## Office integration contract
+
+`/health`, `/ready`, and `/api/service` expose only product name/version,
+API version, capability IDs, auth mode, and health/readiness metadata. They
+contain no topology, user, credential, or call data.
+
+## Trust boundary
+
+This architecture hardens a local single-tenant proof of concept. TLS
+termination, production network segmentation, real carrier behavior, DID and
+emergency routing, legal responsibility, physical endpoints, and operational
+acceptance remain external.

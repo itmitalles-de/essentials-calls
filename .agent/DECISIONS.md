@@ -1,69 +1,100 @@
 # Decisions
 
-The detailed, authoritative rationale is in the **Bewusste Entscheidungen**
-section of [`../docs/roadmap.md`](../docs/roadmap.md). This file is a concise
-index of the implemented choices future agents must not casually undo.
+## Product name without administrative repository migration
 
-## Browser-side audio conversion
+**Decision:** User-visible branding is Essentials+ Calls; repository/package
+namespace, default branch, and Asterisk 18 base remain unchanged.
 
-**Decision:** Convert recorded and uploaded prompts to 8 kHz mono WAV in the
-browser.
+**Reason:** The assignment explicitly separates product naming from technical
+administration and major-version migration.
 
-**Reason:** Recording and upload share one Web Audio path without adding ffmpeg
-to the backend image.
+## SQLite WAL single-tenant persistence
 
-**Alternatives considered:** Server-side conversion with ffmpeg.
+**Decision:** Replace mutable `topology.json` with SQLite WAL for users,
+sessions, audit, revisions, deploy history, and encrypted SIP values.
 
-**Consequences:** Microphone capture requires a secure browser context; the
-backend must still validate WAV headers and sizes.
+**Reason:** It supplies transactions, optimistic concurrency, online backup,
+and durable history without an unjustified PostgreSQL service.
 
-## Generated files plus AMI reload
+**Consequence:** Existing JSON migrates exactly once after a byte-identical,
+mode-`0600` backup. The original plaintext source is removed only after commit;
+the preserved migration artifact is excluded from normal export/backup and
+must be handled as sensitive. Generated Asterisk files remain derivatives.
 
-**Decision:** Generate readable Asterisk config files into a shared volume and
-reload them through AMI.
+## Local sessions and server-side roles
 
-**Reason:** File generation keeps the PoC dialplan inspectable; AMI cannot write
-the files, and files do not become active without a reload.
+**Decision:** Use no-default local users, scrypt hashes, opaque HttpOnly
+sessions, CSRF, and viewer/editor/admin authorization on every API route.
 
-**Alternatives considered:** Asterisk Realtime backed by a database.
+**Reason:** This is the smallest self-contained single-tenant trust boundary.
+OIDC/Office SSO is explicitly deferred.
 
-**Consequences:** Preserve static/generated config separation, validate before
-writing, and test actual call behavior rather than only successful loading.
+## AEAD source secrets and Asterisk 18 HA1 derivatives
 
-## One shared validator
+**Decision:** Encrypt SIP passwords with AES-256-GCM in SQLite and materialize
+them only transiently. Generate Asterisk 18 `md5_cred` HA1 for the fixed
+`asterisk` realm instead of plaintext config.
 
-**Decision:** Keep the topology model and validator in `shared/` for both
-frontend and backend.
+**Reason:** Asterisk 18 supports HA1 but predates newer `password_digest`.
+This meets the no-plaintext persistent-storage boundary without changing the
+Asterisk major.
 
-**Reason:** The editor needs immediate feedback while the backend must not trust
-client-side validation; one implementation prevents rule drift.
+**Consequence:** Keys are supplied separately and backed up separately. Strong
+SIP passwords remain mandatory because HA1 can be guessed offline.
 
-**Alternatives considered:** Separate browser and server validators.
+## Optimistic concurrency and immutable history
 
-**Consequences:** Domain changes must remain compatible with both build paths,
-and the backend must still validate every untrusted request.
+**Decision:** Require `If-Match`, return 409 on stale writes, and implement
+rollback as a new immutable revision.
 
-## Ephemeral runtime status
+**Reason:** Blind last-write-wins is unsafe for parallel editors, while a full
+collaborative merge engine is outside scope.
 
-**Decision:** Keep endpoint/call/queue status separate from the persisted
-topology and push it over WebSocket.
+## Shared validator, authoritative server inventory
 
-**Reason:** Status is a momentary observation of Asterisk, not call-flow design.
+**Decision:** Browser and backend share domain rules, but only the backend
+combines them with the current sound inventory and authorizes persistence.
 
-**Alternatives considered:** Storing status fields in `topology.json`.
+**Reason:** Immediate UX feedback must not make the client a trust boundary.
 
-**Consequences:** Asterisk outages produce `unknown` status without corrupting
-the topology; reconnecting clients must obtain fresh state.
+## Atomic deploy with isolated Asterisk preflight
 
-## Single-file proof-of-concept persistence
+**Decision:** Stage immutable versions, load candidates in a second private
+Asterisk process, atomically switch symlinks, reload/check the live runtime, and
+roll back to last-good.
 
-**Decision:** Store the call-flow source of truth as one `topology.json` file;
-generated Asterisk files are disposable derivatives.
+**Reason:** Text generation and successful writes do not prove loadability or
+runtime activation.
 
-**Reason:** The current scope assumes a single trusted editor and does not need
-a database or collaboration model.
+## AMI events with snapshot fallback
 
-**Alternatives considered:** Database persistence with locking and history.
+**Decision:** Maintain a long-lived AMI connection, event projection,
+heartbeat/backoff/degraded state, reconnect snapshot, and slow polling fallback.
 
-**Consequences:** Concurrent saves can overwrite each other. Do not claim
-multi-user safety, and back up the topology and prompt volume, not generated config.
+**Reason:** Polling alone is stale and expensive; events alone can be lost
+across disconnects. Runtime state remains ephemeral.
+
+## Ring group and queue remain distinct
+
+**Decision:** Ring-group `ringall` is parallel Dial; other ring-group
+strategies are documented ordered approximations. Queue strategies use
+`app_queue` and are only claimed where synthetic runtime evidence exists.
+
+**Reason:** Do not disguise an approximation as native queue semantics.
+
+## No half-finished trunk/DID
+
+**Decision:** Keep trunk/external disabled unless a separate synthetic provider
+can cover the complete required contract.
+
+**Reason:** Partial mock behavior would encourage false carrier and emergency
+claims.
+
+## Separate administrative backup
+
+**Decision:** Normal topology export is redacted; full backup is a CLI archive
+with checksums, encrypted secret state, history, sounds, and last-good config,
+but never the master key.
+
+**Reason:** Sharing a topology and recovering a system have different
+privileges and threat models.

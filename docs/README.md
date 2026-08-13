@@ -1,32 +1,23 @@
-# Dokumentation
+# Essentials+ Calls documentation
 
-Stand: 2026-08-06. Beschreibt den PoC so, wie er im Repo liegt und gegen einen
-laufenden Asterisk 18 verifiziert wurde.
+This documentation describes the hardened local proof of concept as of
+2026-08-13. The technical repository remains `visual-pbx`, and Asterisk stays
+on the existing 18.x base.
 
-| Dokument | Inhalt |
-|---|---|
-| [architecture.md](architecture.md) | Komponenten, Datenfluss, Deploy-Pipeline |
-| [domain-model.md](domain-model.md) | Topology-Modell und alle Validierungsregeln |
-| [asterisk-mapping.md](asterisk-mapping.md) | Wie aus Nodes und Kanten Asterisk-Config wird |
-| [api.md](api.md) | REST- und WebSocket-Schnittstelle |
-| [operations.md](operations.md) | Betrieb, Konfiguration, Testen, Fehlersuche |
-| [asterisk-notes.md](asterisk-notes.md) | Fallstricke, die erst im laufenden Asterisk auffielen |
-| [roadmap.md](roadmap.md) | Was fehlt, und was es kosten würde |
+Start with:
 
-Wer nur schnell starten will: [../README.md](../README.md).
+- [architecture.md](architecture.md) for system boundaries and data flow;
+- [domain-model.md](domain-model.md) for call-flow and revision invariants;
+- [asterisk-mapping.md](asterisk-mapping.md) and
+  [asterisk-notes.md](asterisk-notes.md) before changing generation;
+- [api.md](api.md) for the authenticated API contract;
+- [security.md](security.md) for sessions, authorization, and SIP secrets;
+- [operations.md](operations.md) for local operation and automated acceptance;
+- [backup-restore.md](backup-restore.md) for recovery and key handling;
+- [VERIFICATION_MATRIX.md](VERIFICATION_MATRIX.md) for evidence boundaries;
+- [roadmap.md](roadmap.md) for blocked production work; and
+- [NICE_TO_HAVE.md](NICE_TO_HAVE.md) for explicitly deferred ideas.
 
-## Was der PoC kann
-
-- Callflows als Graph bearbeiten (ComfyUI-artiger Editor) oder als Tabellen.
-- Topologie live validieren — dieselben Regeln im Browser und im Backend.
-- Daraus Asterisk-Config erzeugen und per AMI in einen laufenden Asterisk laden.
-- IVR-Ansagen im Browser aufnehmen oder hochladen.
-- Node-Status (registriert / im Gespräch / Queue-Wartende) live anzeigen.
-- Dark Mode nach Systemeinstellung, manuell übersteuerbar.
-
-## Was er nicht kann
-
-Kein Trunk/DID, also keine Anbindung an das öffentliche Telefonnetz; erreichbar
-sind interne Extensions und generierte Test-Nummern. Kein Mehrbenutzerbetrieb,
-keine Rechteverwaltung, keine Historie. Details und Aufwandsschätzung in
-[roadmap.md](roadmap.md).
+All verified telephony in this repository is local and synthetic. No document
+may turn those results into a claim of provider, DID, emergency-call, carrier,
+real-device, or production readiness.

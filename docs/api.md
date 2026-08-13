@@ -1,142 +1,168 @@
-# API
+# API v1
 
-Basis-URL `http://127.0.0.1:4000` (direkt) oder `/api` über den nginx des
-Frontends. Alle JSON-Antworten sind UTF-8; Fehlermeldungen sind deutsch, weil
-sie unverändert in der Oberfläche angezeigt werden.
+The browser uses `/api` through nginx; the backend is also loopback-bound on
+port 4000 in the local Compose stack. JSON is UTF-8. The API uses a local
+session cookie and a session-bound CSRF token.
 
-## Topologie
+## Service contract (no authentication)
 
-### `GET /api/topology`
+- `GET /health` and `GET /api/health`
+- `GET /ready` and `GET /api/ready`
+- `GET /api/service`
 
-Liefert die gespeicherte Topologie. Beim ersten Start wird die Beispieltopologie
-angelegt.
+They expose only `Essentials+ Calls`, product/API versions, capability IDs,
+auth mode, and health/readiness state. No topology or credentials are included.
 
-> Enthält SIP-Passwörter im Klartext. Siehe [operations.md](operations.md#sicherheit).
+## Authentication
 
-### `PUT /api/topology`
+- `GET /api/auth/session`: current user, CSRF token, and expiry; HTTP 401
+  includes whether bootstrap is required.
+- `POST /api/auth/login`: username/password; sets the HttpOnly session cookie
+  and returns the CSRF token. HTTP 429 includes `Retry-After`.
+- `POST /api/auth/logout` (`viewer`): invalidates the session.
 
-Speichert eine Topologie. Wird nur bei fehlerfreier Validierung geschrieben.
+All subsequent mutations require `X-CSRF-Token`. Authentication errors are
+401, insufficient roles 403, and CSRF failures 403.
 
-```json
-{ "saved": true, "issues": [] }
-```
+## Users and audit (admin)
 
-`400` bei Struktur- oder Regelfehlern:
+- `GET /api/users`
+- `POST /api/users` with `{ username, password, role }`
+- `PATCH /api/users/:id` with role, disabled state, and/or a new password
+- `GET /api/audit?limit=100`
 
-```json
-{ "saved": false, "issues": [{ "severity": "error", "code": "duplicate-sip-user", "message": "…", "nodeId": "ext-102" }] }
-```
+No password hash is returned. HTTP 409 `user-safety` prevents self-disable or
+loss of the final active admin.
 
-### `POST /api/topology/validate`
+## Topology and concurrency
 
-Prüft, ohne zu speichern. Antwortet immer `200` mit `{ "issues": [...] }` —
-auch Warnungen erscheinen hier.
-
-### `POST /api/deploy`
-
-Validiert, speichert, erzeugt die Config und lädt sie in Asterisk.
-
-Mit leerem Body (`{}`) wird die gespeicherte Topologie deployt; mit einer
-Topologie im Body wird diese zuvor gespeichert.
-
-```json
-{ "deployed": true, "issues": [], "configsWritten": true, "reloaded": true }
-```
-
-Wenn Asterisk nicht erreichbar ist, sind die Dateien trotzdem geschrieben:
+`GET /api/topology` (`viewer`) returns:
 
 ```json
-{ "deployed": false, "configsWritten": true, "reloaded": false, "reloadError": "AMI connect timeout (asterisk:5038)" }
+{
+  "topology": {},
+  "revision": 7,
+  "activeRevision": 6,
+  "lastGoodRevision": 6
+}
 ```
 
-`400`, wenn die Validierung Fehler meldet — dann passiert nichts.
+It also sets `ETag: "rev-7"`. Extension objects contain only
+`sipSecret.configured`, never `sipPassword`.
 
-### `GET /api/status`
-
-Momentaufnahme des Node-Status. Für laufende Aktualisierung besser den WebSocket
-nutzen.
+`PUT /api/topology` (`editor`) requires
+`If-Match: "rev-7"`. It creates one immutable revision after shape,
+semantic, and sound-inventory validation. A stale precondition gets HTTP 409:
 
 ```json
-{ "statuses": [ { "nodeId": "ext-101", "availability": "online", "activity": "idle" } ] }
+{
+  "code": "revision-conflict",
+  "expectedRevision": 7,
+  "currentRevision": 8
+}
 ```
 
-Ist Asterisk nicht erreichbar, steht überall `unknown` — kein Fehler.
+`POST /api/topology/validate` (`editor`) validates without writing.
 
-## Ansagen
+## Revision history
 
-### `GET /api/sounds`
+- `GET /api/topology/revisions?limit=50` (`viewer`)
+- `GET /api/topology/revisions/:revision` (`viewer`)
+- `POST /api/topology/revisions/:revision/rollback` (`admin`), with
+  `If-Match`; rollback creates a new revision.
+
+Revision metadata includes actor, timestamp, comment, source, readable summary,
+and whether it is active.
+
+## Import and export
+
+`GET /api/topology/export` (`viewer`) downloads a schema-v2 redacted
+document. This is not an administrative system backup.
+
+- `POST /api/topology/import/dry-run` (`admin`)
+- `POST /api/topology/import` (`admin`, requires `If-Match`)
+
+The limit is 2 MiB. Raw/v1 topology can migrate once, including moving legacy
+SIP passwords into encrypted storage. V2 plaintext secrets are rejected with
+`plaintext-secret-rejected`. Validation, version, corruption, and size
+failures create no partial revision.
+
+## SIP-secret command
+
+`POST /api/extensions/:nodeId/secret` (`admin`) requires `If-Match` and
+`{ "secret": "…" }`. It writes AEAD ciphertext and creates a redacted
+revision. The response never echoes the value.
+
+## Sounds
+
+- `GET /api/sounds` (`viewer`): WAV metadata plus every topology reference.
+- `GET /api/sounds/:name` (`viewer`): WAV data.
+- `PUT /api/sounds/:name` (`editor`): raw WAV, at most 5 MiB; PCM mono,
+  16-bit, 8/16 kHz.
+- `DELETE /api/sounds/:name` (`editor`): HTTP 409 `sound-in-use` with all
+  references while still used.
+
+A DELETE body may provide `replacement`. The replacement must already exist;
+with references, `If-Match` is required. Reference replacement is a new
+revision and file deletion occurs only after it succeeds.
+
+## Deploy
+
+`POST /api/deploy` is admin-only and requires `If-Match`. An empty object
+deploys the current revision; an optional topology candidate is validated and
+saved first.
+
+Success means preflight, activation, targeted reload, and runtime checks all
+passed:
 
 ```json
-{ "sounds": [ { "name": "willkommen", "reference": "custom/willkommen",
-                "sizeBytes": 16044, "updatedAt": "2026-08-06T21:12:53.637Z",
-                "durationSeconds": 1 } ] }
+{
+  "deployed": true,
+  "configsWritten": true,
+  "activated": true,
+  "reloaded": true,
+  "runtimeHealthy": true,
+  "rolledBack": false,
+  "revision": 8,
+  "deploymentId": "…",
+  "checksum": "…",
+  "issues": []
+}
 ```
 
-`reference` ist der Wert, der ins `greeting`-Feld eines IVR gehört.
+A failure is HTTP 503 and reports stage flags plus redacted `error` and
+`rollbackError`. `rolledBack: true` means the prior target was restored,
+reloaded, and runtime-checked. A validation failure is HTTP 400 and performs no
+activation.
 
-### `PUT /api/sounds/:name`
+## Status and WebSocket
 
-Lädt eine Ansage hoch. Body ist die rohe WAV-Datei (kein Multipart),
-`Content-Type: audio/wav`, maximal 5 MB.
-
-Der Name wird auf `[a-z0-9_-]` reduziert; eine Endung `.wav` wird entfernt.
-Punkte sind bewusst nicht erlaubt, damit `..` nicht als Namensbestandteil
-überlebt.
-
-Akzeptiert wird nur, was Asterisk auch abspielen kann: PCM, Mono, 16 Bit,
-8000 oder 16000 Hz. Andernfalls `400` mit konkreter Begründung:
+`GET /api/status` (`viewer`) returns node states and:
 
 ```json
-{ "error": "Nur Mono wird unterstützt (Datei hat 2 Kanäle)." }
+{
+  "connection": {
+    "state": "connected",
+    "lastConnectedAt": "…",
+    "lastEventAt": "…",
+    "reconnectAttempt": 0
+  }
+}
 ```
 
-Die Prüfung ist kein Formalismus — eine Stereo-Datei wird klaglos gespeichert
-und scheitert erst mitten im Anruf.
+`/ws/status` accepts only a valid session cookie and immediately sends a
+`{ "type": "status", ... }` snapshot, followed by deduplicated updates.
+Connection states are `connected`, `reconnecting`, and `degraded`.
 
-```bash
-curl -X PUT http://127.0.0.1:4000/api/sounds/willkommen \
-     -H 'Content-Type: audio/wav' --data-binary @ansage.wav
-```
+## Common status codes
 
-### `GET /api/sounds/:name`
-
-Liefert die WAV-Datei zurück (`audio/wav`), für die Vorschau im Editor.
-
-### `DELETE /api/sounds/:name`
-
-```json
-{ "deleted": true }
-```
-
-Löscht nur die Datei. Ein IVR, das noch darauf zeigt, bleibt unverändert und
-scheitert dann beim Anruf — der Validator kann das nicht sehen, weil die
-Dateiliste nicht Teil der Topologie ist.
-
-## WebSocket
-
-`ws://<host>/ws/status`
-
-Nach dem Verbinden kommt sofort eine Nachricht, danach alle 3 Sekunden:
-
-```json
-{ "type": "status", "statuses": [ { "nodeId": "ext-101", "availability": "online", "activity": "in_call" } ] }
-```
-
-Es gibt keine Nachrichten vom Client zum Server.
-
-## Sonstiges
-
-`GET /api/health` → `{ "ok": true }`
-
-## Fehlerformat
-
-Validierungsfehler kommen als `issues`-Liste (siehe
-[domain-model.md](domain-model.md#validierungsregeln)). Alles andere:
-
-```json
-{ "error": "Ungültiges JSON im Request-Body." }
-```
-
-`500` wird geloggt und generisch beantwortet. Ein fehlerhafter Request beendet
-den Prozess nicht — das war einmal anders und ist mit Error-Middleware und
-Shape-Prüfung behoben.
+| Code | Meaning |
+| --- | --- |
+| 400 | malformed input or domain validation |
+| 401 | no valid session |
+| 403 | role or CSRF failure |
+| 409 | revision conflict, protected sound, or user-safety rule |
+| 413 | request/import/upload too large |
+| 428 | required `If-Match` missing |
+| 429 | login rate limit |
+| 503 | deploy/runtime or readiness failure |

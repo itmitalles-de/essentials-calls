@@ -8,11 +8,20 @@ services:
       PORT: "4000"
       DATA_DIR: /data
       CONFIG_OUT_DIR: /shared-config
+      # Ubuntu 22.04's asterisk user/group is 101. Generated files stay
+      # owner-writable and are group-readable by the Asterisk process only.
+      CONFIG_READER_GID: "101"
+      SOUNDS_READER_GID: "101"
+      ASTERISK_PREFLIGHT_DIR: /shared-config/preflight
+      PBX_REQUIRE_ASTERISK_PREFLIGHT: "true"
       SOUNDS_DIR: /sounds
       AMI_HOST: asterisk
       AMI_PORT: "5038"
       AMI_USERNAME: ${AMI_USERNAME:-visualpbx}
-      AMI_SECRET: ${AMI_SECRET:-visualpbx}
+      AMI_SECRET: ${AMI_SECRET:?Set AMI_SECRET to a synthetic local test value}
+      PBX_MASTER_KEY: ${PBX_MASTER_KEY:?Set PBX_MASTER_KEY to a synthetic 32-byte Base64 value}
+      PBX_ENV: ${PBX_ENV:-development}
+      PBX_SECURE_COOKIES: ${PBX_SECURE_COOKIES:-false}
     volumes:
       - pbx-data:/data
       - asterisk-generated:/shared-config
@@ -23,7 +32,13 @@ services:
     ports:
       # Bound to loopback: the frontend reaches the API through nginx on the
       # compose network, so there is no reason to expose it to the LAN.
-      - "127.0.0.1:4000:4000"
+      - "${PBX_BIND_ADDRESS:-127.0.0.1}:${PBX_BACKEND_PORT:-4000}:4000"
+    healthcheck:
+      interval: 10s
+      timeout: 3s
+      start_period: 15s
+      retries: 5
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
     depends_on:
       - asterisk
 
@@ -33,7 +48,13 @@ services:
       dockerfile: frontend/Dockerfile
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "${PBX_BIND_ADDRESS:-127.0.0.1}:${PBX_FRONTEND_PORT:-8080}:80"
+    healthcheck:
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 5
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
     depends_on:
       - backend
 
@@ -43,17 +64,18 @@ services:
     restart: unless-stopped
     environment:
       AMI_USERNAME: ${AMI_USERNAME:-visualpbx}
-      AMI_SECRET: ${AMI_SECRET:-visualpbx}
+      AMI_SECRET: ${AMI_SECRET:?Set AMI_SECRET to a synthetic local test value}
     volumes:
       - asterisk-generated:/etc/asterisk/generated
       - asterisk-sounds:/usr/local/share/asterisk/sounds
     ports:
-      # SIP/RTP stay open so softphones on the LAN can register.
-      - "5060:5060/udp"
-      - "10000-10100:10000-10100/udp"
+      # The default test/development stack is loopback-only. A production
+      # network design is an explicit deployment concern, not a Compose default.
+      - "${PBX_BIND_ADDRESS:-127.0.0.1}:${PBX_SIP_PORT:-5060}:5060/udp"
+      - "${PBX_BIND_ADDRESS:-127.0.0.1}:${PBX_RTP_PORT_RANGE:-10000-10100}:10000-10100/udp"
       # AMI is a full remote-control interface. The backend talks to it over the
       # compose network, so it is published on loopback only, for debugging.
-      - "127.0.0.1:5038:5038"
+      - "${PBX_BIND_ADDRESS:-127.0.0.1}:${PBX_AMI_PORT:-5038}:5038"
 
 volumes:
   pbx-data:

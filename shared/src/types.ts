@@ -1,4 +1,4 @@
-// Visual PBX domain model (PoC).
+// Essentials+ Calls domain model.
 // Mirrors the design agreed for the callflow editor: topology = nodes + edges + memberships,
 // status is a separate, non-persisted model pushed over WebSocket.
 
@@ -7,6 +7,7 @@ export type NodeType =
   | 'ivr'
   | 'ringgroup'
   | 'queue'
+  | 'schedule'
   | 'voicemail'
   | 'trunk' // reserved, disabled in the PoC
   | 'external'; // reserved, disabled in the PoC
@@ -41,7 +42,14 @@ export interface ExtensionNode extends BaseNode {
   properties: {
     number: string;
     sipUser: string;
-    sipPassword: string;
+    /**
+     * Write-only compatibility field. The backend removes it from stored
+     * revisions and normal read responses; it is only populated transiently
+     * while generating Asterisk configuration or migrating a legacy file.
+     */
+    sipPassword?: string;
+    /** Safe representation returned to clients. */
+    sipSecret?: { configured: boolean };
     callerIdName?: string;
     voicemail?: ExtensionVoicemail;
   };
@@ -79,6 +87,27 @@ export interface QueueNode extends BaseNode {
   };
 }
 
+export type ScheduleWeekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export interface ScheduleWindow {
+  id: string;
+  weekdays: ScheduleWeekday[];
+  /** Local wall-clock time in HH:MM, inclusive. */
+  start: string;
+  /** Local wall-clock time in HH:MM, exclusive; may cross midnight. */
+  end: string;
+}
+
+export interface ScheduleNode extends BaseNode {
+  type: 'schedule';
+  properties: {
+    timezone: string;
+    windows: ScheduleWindow[];
+    /** Explicit closed dates in YYYY-MM-DD form, interpreted in timezone. */
+    holidays: string[];
+  };
+}
+
 export interface VoicemailNode extends BaseNode {
   type: 'voicemail';
   properties: {
@@ -104,6 +133,7 @@ export type PbxNode =
   | IVRNode
   | RingGroupNode
   | QueueNode
+  | ScheduleNode
   | VoicemailNode
   | TrunkNode
   | ExternalNode;
@@ -112,6 +142,8 @@ export type EdgeCondition =
   | { type: 'digit'; value: string }
   | { type: 'timeout' }
   | { type: 'invalid' }
+  | { type: 'open' }
+  | { type: 'closed' }
   | { type: 'unconditional' };
 
 export interface Edge {
@@ -141,6 +173,16 @@ export interface Topology {
   memberships: Membership[];
 }
 
+export const TOPOLOGY_SCHEMA_VERSION = 2 as const;
+
+export interface TopologyExport {
+  schemaVersion: typeof TOPOLOGY_SCHEMA_VERSION;
+  product: 'Essentials+ Calls';
+  exportedAt: string;
+  redacted: boolean;
+  topology: Topology;
+}
+
 // --- Status model (dynamic, not persisted with the topology) ---
 
 export type Availability = 'online' | 'offline' | 'unknown';
@@ -168,11 +210,21 @@ export const DISABLED_NODE_TYPES: ReadonlySet<NodeType> = new Set(['trunk', 'ext
  */
 export const ENTRYPOINT_BASE = 600;
 
+/** Prompts installed by the pinned Asterisk image and safe to reference. */
+export const BUILTIN_PROMPTS: ReadonlySet<string> = new Set([
+  'hello-world',
+  'demo-thanks',
+  'demo-congrats',
+  'pls-hold-while-try',
+  'invalid',
+]);
+
 export const NODE_TYPE_LABELS: Record<NodeType, string> = {
   extension: 'Extension',
   ivr: 'IVR',
   ringgroup: 'Ring Group',
   queue: 'Queue',
+  schedule: 'Schedule',
   voicemail: 'Voicemail',
   trunk: 'Trunk (reserved)',
   external: 'External (reserved)',

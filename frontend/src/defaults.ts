@@ -17,7 +17,7 @@ export function createDefaultNode(type: Exclude<NodeType, 'trunk' | 'external'>,
         properties: {
           number: '100',
           sipUser: '100',
-          sipPassword: 'changeme',
+          sipSecret: { configured: false },
           voicemail: { enabled: false, mailbox: '100' },
         },
       };
@@ -51,6 +51,18 @@ export function createDefaultNode(type: Exclude<NodeType, 'trunk' | 'external'>,
           maxWaitTime: 120,
           joinEmpty: 'yes',
           leaveWhenEmpty: 'no',
+        },
+      };
+    case 'schedule':
+      return {
+        id: newId('schedule'),
+        type: 'schedule',
+        label: 'Öffnungszeiten',
+        position,
+        properties: {
+          timezone: 'Europe/Berlin',
+          windows: [{ id: newId('window'), weekdays: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' }],
+          holidays: [],
         },
       };
     case 'voicemail':

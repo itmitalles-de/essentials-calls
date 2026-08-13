@@ -1,184 +1,104 @@
-# Abbildung auf Asterisk
+# Asterisk 18 mapping
 
-Quelle: `backend/src/asterisk/configGenerator.ts`.
+Source: `backend/src/asterisk/configGenerator.ts` and
+`backend/src/asterisk/deploy.ts`.
 
-## Erzeugte Dateien
+## Generated files
 
-| Datei | Inhalt | eingebunden aus |
-|---|---|---|
-| `pjsip_generated.conf` | AOR, Auth und Endpoint je Extension | `pjsip.conf` |
-| `extensions_generated.conf` | Kontexte `internal`, `entrypoints`, `callflow`, `ivr_*` | `extensions.conf` |
-| `queues_generated.conf` | Queues samt Mitgliedern | `queues.conf` |
-| `voicemail_generated.conf` | Mailboxen | `voicemail.conf`, innerhalb `[default]` |
+Each immutable deployment version contains:
 
-Alle vier werden per `#include` gezogen. Die statischen Basisdateien im Image
-enthalten das, was der Generator nicht anfasst (Transport, Codecs, Logger).
+| File | Content |
+| --- | --- |
+| `pjsip_generated.conf` | AOR/auth/endpoint per extension |
+| `extensions_generated.conf` | internal numbers, synthetic entrypoints, call-flow/IVR/schedule contexts, runtime canary |
+| `queues_generated.conf` | native Asterisk queues and members |
+| `voicemail_generated.conf` | mailboxes in the static `default` context |
+| `manifest.json` | deployment ID, SHA-256 aggregate, and file map |
 
-## Namensgebung
+Static transport/module/logger/CDR settings remain in the Asterisk image.
+Generated text must carry the Essentials+ Calls header, stay under 4 MiB, avoid
+control characters and include/exec directives, and include required contexts.
 
-| Objekt | Name | Beispiel |
-|---|---|---|
-| PJSIP-Endpoint/AOR/Auth | **SIP-User**, bereinigt | `101` |
-| Callflow-Sprungziel | `node_` + Node-ID, bereinigt | `node_ivr_welcome` |
-| IVR-Kontext | `ivr_` + Node-ID | `ivr_ivr_welcome` |
-| Queue | Node-ID, bereinigt | `q_sales` |
+## Names and PJSIP authentication
 
-Bereinigt heißt: alles außer `A-Za-z0-9_` wird zu `_`.
+Endpoint, AOR, and auth names derive from the sanitized SIP user because
+Asterisk identifies inbound registrations by endpoint name. Call-flow targets
+are `node_<sanitized-node-id>`; IVR contexts are
+`ivr_<sanitized-node-id>`; queue names derive from node IDs.
 
-Dass Endpoints nach dem **SIP-User** heißen und nicht nach der Node-ID, ist
-keine Stilfrage — Asterisk gleicht eingehende Registrierungen gegen den
-Endpoint-Namen ab. Details in [asterisk-notes.md](asterisk-notes.md).
+The encrypted password is materialized only in backend memory. Asterisk 18 does
+not support the later `password_digest` option, so the generator writes:
 
-## Dialplan-Struktur
-
-```
-[internal]      ← Kontext der Endpoints: interne Rufnummern, bindet entrypoints ein
-[entrypoints]   ← Testnummern 600, 601, … je ein Node
-[callflow]      ← eine Extension je Node, Sprungziel aller Kanten
-[ivr_<id>]      ← je IVR ein eigener Kontext mit Ziffern-, t- und i-Extension
-```
-
-Der Callflow-Kontext ist der Kern: Jeder Node bekommt dort eine Extension, und
-jede Kante wird zu einem `Goto` dorthin. Dadurch bleibt der generierte Dialplan
-eine direkte Übersetzung des Graphen.
-
-Auszug aus dem laufenden System:
-
-```
-[internal]
-include => entrypoints
-exten => 101,1,NoOp(Calling Alice)
- same => n,Dial(PJSIP/101,20)
- same => n,VoiceMail(101@default,u)
- same => n,Hangup()
-
-[entrypoints]
-exten => 600,1,Goto(callflow,node_ext_101,1)  ; extension "Alice"
-exten => 603,1,Goto(callflow,node_ivr_welcome,1)  ; ivr "Willkommens-IVR"
-
-[callflow]
-exten => node_ivr_welcome,1,NoOp(Enter IVR Willkommens-IVR)
- same => n,Goto(ivr_ivr_welcome,s,1)
+```ini
+[101]
+type=auth
+auth_type=md5
+realm=asterisk
+username=101
+md5_cred=<MD5 of 101:asterisk:password>
 ```
 
-## Node-Typ → Dialplan
+This preserves Asterisk 18 compatibility and removes plaintext from generated
+storage. Strong random SIP passwords and restrictive file permissions remain
+necessary because HA1 permits offline guessing.
 
-### extension
+## Dialplan mapping
 
-```
-exten => node_<id>,1,NoOp(Route to extension <label>)
- same => n,Dial(PJSIP/<sipUser>,20)
- same => n,<Fallback-Goto oder VoiceMail>
- same => n,Hangup()
-```
+- **Extension:** `Dial(PJSIP/<endpoint>,20)`, then its fallback or embedded
+  voicemail, then hangup.
+- **IVR:** `Background`, `WaitExten`, digit extensions, timeout, bounded
+  invalid retries, and explicit destinations.
+- **Ring group:** `ringall` produces one parallel `Dial(A&B,…)`; other
+  ring-group strategies produce an ordered series and are clearly
+  approximations.
+- **Queue:** native `Queue(<id>,,,,<maxWaitTime>)`; per-agent timeout,
+  strategy, empty policy, and members live in `queues_generated.conf`.
+- **Schedule:** explicit holiday comparisons route closed first; each window
+  becomes timezone-aware `GotoIfTime` clauses. Midnight windows split across
+  the source and following weekday.
+- **Voicemail:** `VoiceMail(<mailbox>@default,u)`, then hangup.
 
-Ohne Fallback-Kante, aber mit aktiver Voicemail, landet der Anruf in der
-Mailbox. Ohne beides wird aufgelegt.
+Every node also receives a synthetic entrypoint starting at 600. These are
+local test aids, not DIDs. The validator warns if an internal extension shadows
+one.
 
-### ivr
+## Staging, preflight, and activation
 
-Ein eigener Kontext:
+Generation writes mode-0640 files into
+`versions/.staging-<deployment-id>`, then renames the complete directory.
+The Asterisk container's private filesystem worker copies static config into a
+disposable tree, starts a separate Asterisk 18 process, loads the candidate,
+and checks dialplan/PJSIP readiness. No Docker socket or public validation
+endpoint is used.
 
-```
-[ivr_<id>]
-exten => s,1,NoOp(IVR <label>)
- same => n,Set(RETRY_<id>=0)
- same => n(menu),Background(<greeting>)
- same => n,WaitExten(<timeout>)
-exten => 1,1,Goto(callflow,node_<ziel>,1)      ← je digit-Kante
-exten => t,1,NoOp(IVR timeout)
- same => n,Goto(callflow,node_<ziel>,1)        ← timeout-Kante, sonst Hangup
-exten => i,1,Set(RETRY_<id>=$[0${RETRY_<id>} + 1])
- same => n,Playback(invalid)
- same => n,GotoIf($[0${RETRY_<id>} >= <retries>]?<invalid-Ziel oder giveup>)
- same => n,Goto(ivr_<id>,s,menu)
-exten => giveup,1,Hangup()
-```
+After preflight, the backend atomically swaps `current`, invokes targeted AMI
+reloads, and verifies:
 
-Zwei Feinheiten, die beide aus echten Fehlern stammen: Der Zähler wird beim
-Eintritt gesetzt, und der erneute Prompt springt auf das Label `menu` statt auf
-Priorität 1 — sonst würde der Zähler bei jeder Fehleingabe zurückgesetzt und die
-Schleife liefe endlos. Das `0`-Präfix im Ausdruck hält die Arithmetik auch dann
-gültig, wenn die Variable nicht gesetzt ist.
+- `core show version` returns Asterisk;
+- the internal dialplan is active;
+- the unique deployment canary is visible; and
+- at least the expected number of PJSIP endpoints exists.
 
-### ringgroup
+Only then does it atomically update `last-good` and the active revision.
+Failure after activation restores the former symlink, reloads it, checks its
+runtime, and records `failed-rolled-back` or a rollback error.
 
-`ringall` klingelt parallel:
+## Queue versus ring group
 
-```
- same => n,Dial(PJSIP/101&PJSIP/102,<ringTimeout>)
-```
+A ring group is a simple distribution attempt without queue state. Only its
+`ringall` behavior is truly parallel; the other values are ordered
+approximations.
 
-Alle anderen Strategien werden als sequentielle Kette in Membership-Reihenfolge
-angenähert, weil `Dial()` keine Reihenfolge kennt:
+A queue uses `app_queue`, emits caller/member events, has per-agent and total
+timeouts, empty policies, and persistent in-memory queue behavior across
+configuration reloads. Legacy `roundrobin` maps to Asterisk's `rrmemory`.
 
-```
- same => n,Dial(PJSIP/101,<ringTimeout>)
- same => n,Dial(PJSIP/102,<ringTimeout>)
-```
+No reporting warehouse, SLA analytics, or carrier call distribution is
+implemented.
 
-Das ist eine Näherung, keine echte Umsetzung: Über mehrere Anrufe hinweg gibt es
-kein Gedächtnis, echtes Round-Robin bräuchte `app_queue`. Der Validator lehnt
-mitgliederlose Gruppen ab; der Generator gibt in dem Fall trotzdem ein `NoOp`
-statt eines kaputten `Dial()` aus.
+## Runtime evidence boundary
 
-### queue
-
-```
-exten => node_<id>,1,NoOp(Queue <label>)
- same => n,Queue(<id>,,,,<maxWaitTime>)
-```
-
-Das fünfte Argument ist die Gesamtwartezeit. Das `timeout` in `queues.conf` ist
-nur die Klingeldauer pro Agent — beides zu verwechseln ist ein klassischer
-Fehler.
-
-In `queues.conf`:
-
-```
-[<id>]
-musiconhold=default
-strategy=<strategy>      ; roundrobin wird zu rrmemory übersetzt
-timeout=<timeout>
-maxlen=0
-joinempty=<joinEmpty>
-leavewhenempty=<leaveWhenEmpty>
-member => PJSIP/<sipUser>,0,<label>
-```
-
-### voicemail
-
-```
-exten => node_<id>,1,NoOp(Voicemail <label>)
- same => n,VoiceMail(<mailbox>@default,u)
- same => n,Hangup()
-```
-
-## Test-Entry-Points
-
-Ohne Trunk gäbe es keinen Weg, einen Callflow anzurufen. Der Generator legt
-deshalb ab `600` je Node eine Nummer an, in Reihenfolge der Node-Liste, und
-bindet den Kontext in `internal` ein. Die Zuordnung steht als Kommentar in der
-generierten Datei:
-
-```bash
-docker compose exec asterisk asterisk -rx "dialplan show entrypoints"
-```
-
-Eine Extension mit einer Nummer aus diesem Bereich verdeckt den Entry-Point —
-der Validator warnt mit `entrypoint-collision`.
-
-## Reload
-
-Nach dem Schreiben führt das Backend über AMI aus:
-
-```
-dialplan reload
-pjsip reload
-queue reload all
-voicemail reload
-```
-
-Schlägt der Reload fehl, meldet die API `deployed: false` mit `reloadError`, aber
-`configsWritten: true` — die Dateien liegen dann korrekt vor und werden beim
-nächsten Asterisk-Start gelesen.
+The acceptance stack proves these configurations load and execute on the
+pinned Ubuntu 22.04 Asterisk 18 package using SIPp, AMI, and CDR events. It says
+nothing about a real provider, public number, emergency call, customer
+firewall/NAT, handset, or real-network audio quality.

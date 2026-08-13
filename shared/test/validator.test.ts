@@ -1,8 +1,9 @@
 import { strict as assert } from 'node:assert';
 import { test, describe } from 'node:test';
 import { hasErrors, validateTopology, validateTopologyShape, ValidationIssue } from '../src/validator';
-import { extension, ivr, queue, ringGroup, topology, voicemailNode } from '../src/testFixtures';
+import { extension, ivr, queue, ringGroup, schedule, topology, voicemailNode } from '../src/testFixtures';
 import { Topology } from '../src/types';
+import { isScheduleOpen } from '../src/schedule';
 
 function codes(issues: ValidationIssue[]): string[] {
   return issues.map((i) => i.code);
@@ -138,6 +139,64 @@ describe('validateTopology', () => {
   test('warns when an extension number shadows a generated entry point', () => {
     const t = topology({ nodes: [extension('a', '600')] });
     assert.ok(codes(validateTopology(t)).includes('entrypoint-collision'));
+  });
+
+  test('checks IVR greetings against the supplied sound inventory', () => {
+    const t = topology({ nodes: [ivr('ivr', { greeting: 'custom/missing' })] });
+    assert.ok(codes(validateTopology(t, { soundReferences: new Set(['hello-world']) })).includes('ivr-greeting-not-found'));
+    assert.ok(!codes(validateTopology(t, { soundReferences: new Set(['custom/missing']) })).includes('ivr-greeting-not-found'));
+  });
+
+  test('requires exactly one open and closed schedule edge', () => {
+    const t = topology({
+      nodes: [schedule('hours'), extension('open', '101'), voicemailNode('closed', '900')],
+      edges: [{ id: 'open', source: 'hours', target: 'open', condition: { type: 'open' } }],
+    });
+    assert.ok(codes(validateTopology(t)).includes('schedule-missing-closed-edge'));
+  });
+
+  test('rejects invalid timezone and overlapping schedule windows', () => {
+    const t = topology({
+      nodes: [
+        schedule('hours', {
+          timezone: 'Mars/Olympus',
+          windows: [
+            { id: 'one', weekdays: [1], start: '09:00', end: '12:00' },
+            { id: 'two', weekdays: [1], start: '11:00', end: '13:00' },
+          ],
+        }),
+        extension('open', '101'),
+        voicemailNode('closed', '900'),
+      ],
+      edges: [
+        { id: 'open', source: 'hours', target: 'open', condition: { type: 'open' } },
+        { id: 'closed', source: 'hours', target: 'closed', condition: { type: 'closed' } },
+      ],
+    });
+    const found = codes(validateTopology(t));
+    assert.ok(found.includes('schedule-invalid-timezone'));
+    assert.ok(found.includes('schedule-overlapping-windows'));
+  });
+});
+
+describe('schedule evaluation', () => {
+  test('uses Europe/Berlin across winter and summer time', () => {
+    const node = schedule('hours');
+    assert.equal(isScheduleOpen(node, new Date('2026-01-12T09:00:00Z')), true); // 10:00 CET
+    assert.equal(isScheduleOpen(node, new Date('2026-07-13T08:00:00Z')), true); // 10:00 CEST
+    assert.equal(isScheduleOpen(node, new Date('2026-07-13T16:00:00Z')), false); // 18:00 CEST
+  });
+
+  test('handles weekend, holiday and midnight-spanning windows', () => {
+    const node = schedule('night', {
+      windows: [{ id: 'night', weekdays: [5], start: '22:00', end: '02:00' }],
+      holidays: ['2026-08-14'],
+    });
+    assert.equal(isScheduleOpen(node, new Date('2026-08-14T21:00:00Z')), false, 'explicit holiday closes Friday');
+    node.properties.holidays = [];
+    assert.equal(isScheduleOpen(node, new Date('2026-08-14T21:00:00Z')), true, 'Friday 23:00 local is open');
+    assert.equal(isScheduleOpen(node, new Date('2026-08-14T23:00:00Z')), true, 'Saturday 01:00 belongs to Friday window');
+    assert.equal(isScheduleOpen(node, new Date('2026-08-15T01:00:00Z')), false, 'Saturday 03:00 is closed');
   });
 });
 

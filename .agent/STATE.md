@@ -1,104 +1,78 @@
-# Current State
+# Current state
 
-## Project goal
+## Product and branch
 
-Visual PBX is a visual editor for internal Asterisk call flows. It stores one
-topology, validates it in both browser and backend, generates Asterisk config,
-reloads Asterisk through AMI, and shows live endpoint/queue status.
+- Visible product: **Essentials+ Calls**.
+- Technical repository/npm namespace: `visual-pbx` (intentionally unchanged).
+- Default branch: `master` (intentionally unchanged).
+- Current work branch: `agent/essentials-calls-autonomous`.
+- Asterisk base: Ubuntu 22.04 package, Asterisk 18.x (no major migration).
+- Scope: hardened local/synthetic proof of concept, not production telephony.
 
-## Current status
+## Implemented
 
-- Default branch: `master`.
-- Implementation baseline inspected: `039d5e4` (the documentation-only commit
-  immediately before this persistent handoff migration).
-- The checkout was clean and matched `origin/master` after a fresh fetch.
-- The repository is explicitly a functional proof of concept, not a production
-  PBX product.
-- `docs/roadmap.md` records runtime verification against Asterisk 18 dated
-  2026-08-06. That runtime environment was not independently rechecked during
-  this documentation migration.
-- GitHub had no open issues or pull requests at the handoff.
+- SQLite WAL single-tenant store for users, sessions, login-rate state, redacted
+  immutable topology revisions, AES-256-GCM SIP secrets, deployments, and audit.
+- One-time `topology.json` migration with an unchanged pre-migration copy.
+- Bootstrap-only first admin; scrypt, HttpOnly/SameSite sessions, expiry/logout,
+  CSRF, role enforcement, rate limiting, security headers, last-admin safety.
+- Masked topology API, explicit secret changes, wrong-key/cipher-tamper checks,
+  transactional key rotation, and Asterisk 18 MD5 HA1 generation without
+  plaintext in generated config.
+- ETag/`If-Match`, HTTP 409, revision comments/summaries, retention, and
+  rollback forward as a new revision.
+- Versioned v2 JSON schema, 2 MiB import limit, v1 migration, dry-run,
+  atomic import, and redacted normal export.
+- Sound inventory validation, all-reference display, protected delete,
+  deliberate replacement, and atomic WAV upload.
+- Bounded undo/redo excluding selection/viewport, keyboard shortcuts, graph and
+  table editing, role UI, revisions, theme persistence.
+- Schedule node with IANA timezone, windows, explicit holidays, two outputs,
+  Europe/Berlin DST/midnight/weekend tests, and `GotoIfTime` generation.
+- Atomic staged deploy, generator safety scan, isolated Asterisk preflight,
+  immutable version directories, symlink activation, targeted reload, runtime
+  canary/endpoint checks, last-good rollback, and audit.
+- Long-lived AMI event connection with heartbeat, backoff, degraded state,
+  dedupe, reconnect snapshot, slow polling fallback, and authenticated
+  WebSocket push.
+- Native queues and explicit separation from ring-group approximations.
+- Checksummed CLI backup/empty restore with key kept separate and sessions
+  invalidated.
+- Topology-free product/health/readiness/capability contract.
+- GitHub Actions jobs for static checks, Compose/image build, SIPp/Asterisk,
+  Playwright, and live backup/restore.
 
-## Working
+## Verified locally on 2026-08-13
 
-- React/React Flow offers graph and advanced table views over one shared topology.
-- The shared package performs structural and semantic validation in browser and
-  backend; deploy is blocked on validation errors.
-- The backend stores `topology.json`, generates PJSIP/dialplan/queue/voicemail
-  files, and requests reloads over AMI.
-- Browser recording/upload converts prompts to 8 kHz mono WAV; the backend
-  validates uploads and stores them in the shared sounds volume.
-- WebSocket status reflects periodic AMI polling and is not persisted.
-- Docker Compose runs frontend/nginx, backend/Express, and Asterisk 18, with
-  named volumes for topology data, generated config, and sounds.
-- Existing documentation reports verified SIP registration, call-flow execution,
-  prompt playback, voicemail, malformed-request handling, editor behavior, and
-  52 validator/generator/sound tests.
+- `npm audit --audit-level=moderate`: zero advisories.
+- After the latest source changes, `npm run typecheck`, `npm test`,
+  `npm run build`, and `git diff --check`: passed.
+- Tests: 29 shared and 66 backend (95 total), no skips/todos.
+- Last fresh Playwright/Compose run: 8/8 semantic tests passed. It predates the
+  latest editor-history assertion and WebSocket session-revalidation patch, so
+  a final fresh run is still required.
+- Last fresh Asterisk/SIPp acceptance: 22 semantic checks passed, then restart and
+  SQLite/active-deployment persistence passed.
+- Registration includes multiple endpoints and replacement registration.
+- Calls cover direct internal, ring group, queue, schedule open path, IVR
+  playback/timeout/valid-invalid DTMF, voicemail, AMI channel/queue/hangup, CDR,
+  WebSocket, deploy, invalid block, reload, corrupt activation rollback.
+- Live backup/empty restore previously passed source calls, checksummed archive,
+  separate key, target restore, and post-restore callflows. The full-stack and
+  restore runs predate the latest migration/file-mode/AMI-input hardening.
+- Compose validation and image builds previously passed; images have not been
+  rebuilt since the latest Asterisk entrypoint and sound-volume changes.
 
-## Active work
+## Evidence boundary
 
-No active repository-specific workstream is recorded. The old root handoff also
-contained no active goal. Select work from a user request or `docs/roadmap.md`.
+All telephone identities, credentials, prompts, and calls are synthetic. No
+trunk, DID, emergency call, carrier, physical endpoint, real-network audio,
+customer NAT/firewall, or production behavior has been verified. See
+`docs/VERIFICATION_MATRIX.md` and `docs/roadmap.md`.
 
-## Recently completed
+## Publication state
 
-- `04631fa` translated the root README to English.
-- `7a613bc` added the detailed architecture, domain, API, operations, pitfalls,
-  and roadmap documentation set.
-- `2c43720` added prompt recording/upload and themed dark mode.
-- `039d5e4` added a generic root handoff, now migrated into `.agent/`.
-
-## Known issues
-
-- No authentication or authorization protects the UI/API.
-- SIP passwords are plaintext in `topology.json` and API responses.
-- There is no trunk/DID or public telephone network integration; only internal
-  extensions and generated test numbers are implemented.
-- One JSON file has no locking or history; concurrent saves overwrite each other.
-- UI and SIP/RTP bind to all interfaces; this stack is for a trusted network,
-  not direct internet exposure.
-- Status polls AMI every three seconds rather than subscribing to events.
-- A sound may be deleted while an IVR still references it; deploy validation does
-  not currently include the sound inventory.
-- `trunk` and `external` exist only as reserved, disabled model types.
-- Microphone recording requires localhost or HTTPS; plain LAN HTTP allows upload
-  but browsers generally block microphone capture.
-- `npm audit` reports one high and one moderate development-tooling advisory in
-  Vite/esbuild. Its suggested fix upgrades Vite across a major-version boundary;
-  no dependency change was made during this documentation migration.
-
-## Next recommended tasks
-
-`docs/roadmap.md` is authoritative. Its highest-value small candidate is to
-validate IVR sound references before deploy. Authentication and safer SIP-secret
-handling are the first medium-sized prerequisites for use beyond a trusted PoC.
-No item is currently selected as active.
-
-## Relevant files
-
-- `docs/architecture.md` — implemented component and data-flow architecture.
-- `docs/roadmap.md` — verified status, limitations, decisions, and candidate work.
-- `docs/asterisk-notes.md` — runtime-verified generator constraints.
-- `shared/src/types.ts` and `shared/src/validator.ts` — model and invariants.
-- `backend/src/api/routes/topology.ts` — validation/save/deploy API flow.
-- `backend/src/asterisk/configGenerator.ts` and `deploy.ts` — generated config.
-- `backend/src/model/store.ts` — single-file topology persistence.
-- `frontend/src/App.tsx` and `frontend/src/views/` — editor flows.
-- `docker-compose.yml` — services, ports, and volumes.
-
-## Validation
-
-- `npm test`: passed, 52/52 tests.
-- `npm run typecheck`: passed.
-- `npm run build`: passed, including the Vite production bundle.
-- `docker compose config --quiet`: passed.
-- `npm audit`: reported one high and one moderate Vite/esbuild advisory.
-
-These commands ran with Node 24.10.0; CI declares Node 20. Compose images and a
-live Asterisk call flow were not rebuilt or rerun for this documentation-only
-change.
-
-## Last handoff
-
-2026-08-13: Replaced the generic root `TODO.md` with the persistent `.agent/`
-workflow. No real task was removed; the established roadmap remains canonical.
+The branch contains a local hardening snapshot commit (see `git log`). It has
+not been pushed and no new draft PR has been opened. Existing GitHub draft PR
+#2 is unrelated and must not be merged or repurposed. The exact unfinished work
+is recorded in `.agent/TODO.md`.

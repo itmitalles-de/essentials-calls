@@ -12,8 +12,10 @@ COPY conf-templates/pjsip.conf /etc/asterisk/pjsip.conf
 COPY conf-templates/extensions.conf /etc/asterisk/extensions.conf
 COPY conf-templates/queues.conf /etc/asterisk/queues.conf
 COPY conf-templates/voicemail.conf /etc/asterisk/voicemail.conf
+COPY conf-templates/cdr_manager.conf /etc/asterisk/cdr_manager.conf
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY preflight-worker.sh /preflight-worker.sh
+RUN chmod +x /entrypoint.sh /preflight-worker.sh
 
 EXPOSE 5060/udp 5038 10000-10100/udp
 

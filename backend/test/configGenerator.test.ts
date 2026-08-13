@@ -1,4 +1,5 @@
 import { strict as assert } from 'node:assert';
+import crypto from 'node:crypto';
 import { test, describe } from 'node:test';
 import { fixtures, Topology } from '@visual-pbx/shared';
 import {
@@ -9,7 +10,7 @@ import {
   generateVoicemailConf,
 } from '../src/asterisk/configGenerator';
 
-const { extension, ivr, queue, ringGroup, topology, voicemailNode } = fixtures;
+const { extension, ivr, queue, ringGroup, schedule, topology, voicemailNode } = fixtures;
 
 function officeTopology(): Topology {
   return topology({
@@ -35,7 +36,9 @@ describe('generatePjsipConf', () => {
   test('emits aor, auth and endpoint per extension', () => {
     const conf = generatePjsipConf(officeTopology());
     assert.match(conf, /\[101\]\ntype=aor/);
-    assert.match(conf, /\[101\]\ntype=auth\nauth_type=userpass\nusername=101\npassword=pw-101/);
+    const digest = crypto.createHash('md5').update('101:asterisk:pw-101').digest('hex');
+    assert.match(conf, new RegExp(`\\[101\\]\\ntype=auth\\nauth_type=md5\\nrealm=asterisk\\nusername=101\\nmd5_cred=${digest}`));
+    assert.ok(!conf.includes('pw-101'), 'generated config must not contain a plaintext SIP secret');
     assert.match(conf, /\[101\]\ntype=endpoint/);
     assert.match(conf, /callerid="Ext 101" <101>/);
   });
@@ -136,6 +139,35 @@ describe('generateExtensionsConf', () => {
       memberships: [{ id: 'm1', groupId: 'q-sales', memberId: 'ext-a', role: 'agent' }],
     });
     assert.match(generateExtensionsConf(t), /same => n,Queue\(q_sales,,,,90\)/);
+  });
+
+  test('maps Europe/Berlin schedules, holidays and midnight windows', () => {
+    const t = topology({
+      nodes: [
+        schedule('hours', {
+          windows: [{ id: 'night', weekdays: [5], start: '22:00', end: '02:00' }],
+          holidays: ['2026-12-25'],
+        }),
+        extension('open', '101'),
+        voicemailNode('closed', '900'),
+      ],
+      edges: [
+        { id: 'open-edge', source: 'hours', target: 'open', condition: { type: 'open' } },
+        { id: 'closed-edge', source: 'hours', target: 'closed', condition: { type: 'closed' } },
+      ],
+    });
+    const conf = generateExtensionsConf(t);
+    assert.match(conf, /STRFTIME\(\$\{EPOCH\},Europe\/Berlin,%Y-%m-%d\).*2026-12-25/);
+    assert.match(conf, /GotoIfTime\(22:00-23:59,fri,\*,\*,Europe\/Berlin\?callflow,node_open,1\)/);
+    assert.match(conf, /GotoIfTime\(00:00-01:59,sat,\*,\*,Europe\/Berlin\?callflow,node_open,1\)/);
+    assert.match(conf, /Goto\(callflow,node_closed,1\)/);
+  });
+
+  test('neutralizes display-label config injection', () => {
+    const ext = extension('ext', '101');
+    ext.label = 'safe)\nexten => 999,1,System(evil)';
+    const conf = generateExtensionsConf(topology({ nodes: [ext] }));
+    assert.ok(!conf.includes('\nexten => 999'));
   });
 });
 

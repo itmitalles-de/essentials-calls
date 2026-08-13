@@ -5,6 +5,16 @@ on:
     branches: [master, main]
   pull_request:
 
+permissions:
+  contents: read
+
+env:
+  AMI_USERNAME: visualpbx
+  AMI_SECRET: synthetic-ci-ami-secret-2026
+  PBX_MASTER_KEY: BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=
+  ACCEPTANCE_ADMIN_PASSWORD: SyntheticCiAdmin-2026!
+  PBX_ENV: test
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -18,6 +28,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Dependency advisories
+        run: npm audit --audit-level=moderate
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -29,10 +42,59 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
-      # Catches breakage in the Dockerfiles themselves (e.g. a base image that
-      # no longer ships the asterisk package), which the node job cannot see.
+      - name: Validate compose models
+        run: |
+          docker compose config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.acceptance.yml --profile acceptance config --quiet
+
       - name: Build all compose images
-        run: docker compose build
+        run: docker compose -f docker-compose.yml -f docker-compose.acceptance.yml --profile acceptance build
+
+  synthetic-telephony:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Full-stack Asterisk and SIPp acceptance
+        run: npm run test:full-stack
+
+  browser-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Semantic browser acceptance
+        run: npm run test:e2e
+
+  backup-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Empty restore and post-restore SIP callflow
+        run: npm run test:backup-restore

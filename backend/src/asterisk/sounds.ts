@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
@@ -6,7 +7,9 @@ import path from 'path';
 // <astdatadir>/sounds/ — and on Debian/Ubuntu
 // /usr/share/asterisk/sounds/custom is a symlink to /usr/local/share/asterisk/sounds.
 // So a file stored here as "greeting.wav" is played as "custom/greeting".
-const SOUNDS_DIR = process.env.SOUNDS_DIR ?? path.join(__dirname, '..', '..', 'data', 'sounds');
+function configuredSoundsDir(): string {
+  return process.env.SOUNDS_DIR ?? path.join(__dirname, '..', '..', 'data', 'sounds');
+}
 
 /** Prefix Asterisk needs to find files in the custom sounds directory. */
 export const CUSTOM_SOUND_PREFIX = 'custom/';
@@ -23,9 +26,23 @@ export interface SoundInfo {
 
 export class SoundValidationError extends Error {}
 
+function soundReaderGid(): number {
+  const value = process.env.SOUNDS_READER_GID;
+  if (value === undefined) return process.getgid?.() ?? 0;
+  if (!/^\d+$/.test(value)) throw new SoundValidationError('SOUNDS_READER_GID muss eine numerische Gruppen-ID sein.');
+  return Number(value);
+}
+
+function makeReadableByAsterisk(filePath: string, mode: number): void {
+  fs.chmodSync(filePath, mode);
+  fs.chownSync(filePath, process.getuid?.() ?? 0, soundReaderGid());
+}
+
 export function soundsDir(): string {
-  fs.mkdirSync(SOUNDS_DIR, { recursive: true });
-  return SOUNDS_DIR;
+  const directory = configuredSoundsDir();
+  fs.mkdirSync(directory, { recursive: true, mode: 0o750 });
+  makeReadableByAsterisk(directory, 0o750);
+  return directory;
 }
 
 /**
@@ -78,6 +95,7 @@ export function parseWav(buffer: Buffer): WavHeader {
     const chunkId = buffer.toString('ascii', offset, offset + 4);
     const chunkSize = buffer.readUInt32LE(offset + 4);
     const body = offset + 8;
+    if (body + chunkSize > buffer.length) throw new SoundValidationError(`WAV-Chunk "${chunkId}" ist abgeschnitten.`);
 
     if (chunkId === 'fmt ' && body + 16 <= buffer.length) {
       fmt = {
@@ -87,7 +105,7 @@ export function parseWav(buffer: Buffer): WavHeader {
         bitsPerSample: buffer.readUInt16LE(body + 14),
       };
     } else if (chunkId === 'data') {
-      dataBytes = Math.min(chunkSize, buffer.length - body);
+      dataBytes = chunkSize;
     }
 
     offset = body + chunkSize + (chunkSize % 2); // chunks are word-aligned
@@ -108,7 +126,20 @@ export function parseWav(buffer: Buffer): WavHeader {
 export function saveSound(rawName: string, buffer: Buffer): SoundInfo {
   const header = parseWav(buffer);
   const name = sanitizeSoundName(rawName);
-  fs.writeFileSync(soundPath(name), buffer);
+  const destination = soundPath(name);
+  const temporary = path.join(soundsDir(), `.${name}-${crypto.randomUUID()}.tmp`);
+  try {
+    fs.writeFileSync(temporary, buffer, { mode: 0o640, flag: 'wx' });
+    makeReadableByAsterisk(temporary, 0o640);
+    fs.renameSync(temporary, destination);
+  } catch (error) {
+    try {
+      fs.unlinkSync(temporary);
+    } catch (cleanupError) {
+      if ((cleanupError as NodeJS.ErrnoException).code !== 'ENOENT') throw cleanupError;
+    }
+    throw error;
+  }
   return {
     name,
     reference: `${CUSTOM_SOUND_PREFIX}${name}`,

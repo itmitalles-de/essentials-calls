@@ -21,6 +21,7 @@ export class AmiClient extends EventEmitter {
   private actionCounter = 0;
   private pending = new Map<string, PendingAction>();
   public connected = false;
+  private connectPromise: Promise<void> | null = null;
 
   constructor(
     private host: string,
@@ -32,28 +33,36 @@ export class AmiClient extends EventEmitter {
   }
 
   connect(timeoutMs = 4000): Promise<void> {
-    return new Promise((resolve, reject) => {
+    if (this.connected) return Promise.resolve();
+    if (this.connectPromise) return this.connectPromise;
+    const attempt = new Promise<void>((resolve, reject) => {
       const socket = net.createConnection({ host: this.host, port: this.port });
       this.socket = socket;
       this.buffer = '';
       this.bannerReceived = false;
       socket.setEncoding('utf-8');
 
-      const connectTimer = setTimeout(() => {
-        socket.destroy();
-        reject(new Error(`AMI connect timeout (${this.host}:${this.port})`));
+      let settled = false;
+      let connectTimer: NodeJS.Timeout;
+      const settle = (callback: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(connectTimer);
+        callback();
+      };
+      connectTimer = setTimeout(() => {
+        settle(() => {
+          socket.destroy();
+          reject(new Error(`AMI connect timeout (${this.host}:${this.port})`));
+        });
       }, timeoutMs);
 
       socket.on('data', (chunk: string) => this.onData(chunk));
-      socket.once('connect', () => {
-        clearTimeout(connectTimer);
-      });
       socket.on('error', (err) => {
-        clearTimeout(connectTimer);
         this.failAllPending(err);
         this.connected = false;
         this.emit('closed');
-        reject(err);
+        settle(() => reject(err));
       });
       socket.on('close', () => {
         // Anything still waiting for a reply will never get one; rejecting here
@@ -65,14 +74,21 @@ export class AmiClient extends EventEmitter {
 
       this.login()
         .then(() => {
-          this.connected = true;
-          resolve();
+          settle(() => {
+            this.connected = true;
+            resolve();
+          });
         })
         .catch((err) => {
-          clearTimeout(connectTimer);
-          reject(err);
+          socket.destroy();
+          settle(() => reject(err));
         });
     });
+    const tracked = attempt.finally(() => {
+      if (this.connectPromise === tracked) this.connectPromise = null;
+    });
+    this.connectPromise = tracked;
+    return tracked;
   }
 
   private failAllPending(err: Error): void {
@@ -114,7 +130,9 @@ export class AmiClient extends EventEmitter {
     for (const line of block.split('\r\n')) {
       const sep = line.indexOf(':');
       if (sep === -1) continue;
-      msg[line.slice(0, sep).trim()] = line.slice(sep + 1).trim();
+      const key = line.slice(0, sep).trim();
+      const value = line.slice(sep + 1).trim();
+      msg[key] = key === 'Output' && msg[key] ? `${msg[key]}\n${value}` : value;
     }
     if (Object.keys(msg).length === 0) return;
 
@@ -170,11 +188,12 @@ export class AmiClient extends EventEmitter {
     }
   }
 
-  async runCommand(command: string): Promise<void> {
+  async runCommand(command: string): Promise<string> {
     const msgs = await this.sendAction({ Action: 'Command', Command: command });
-    if (msgs[0]?.Response !== 'Success') {
+    if (!['Success', 'Follows'].includes(msgs[0]?.Response ?? '')) {
       throw new Error(`AMI command "${command}" failed: ${msgs[0]?.Message ?? 'unknown error'}`);
     }
+    return msgs.map((message) => message.Output ?? message.Message ?? '').filter(Boolean).join('\n');
   }
 
   async deployReload(): Promise<void> {

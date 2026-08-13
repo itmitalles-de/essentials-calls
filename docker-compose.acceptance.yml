@@ -1,0 +1,35 @@
+services:
+  backend:
+    environment:
+      PBX_ENV: test
+
+  acceptance:
+    profiles: [acceptance]
+    build:
+      context: .
+      dockerfile: tests/acceptance/Dockerfile
+    environment:
+      ACCEPTANCE_API_URL: http://backend:4000/api
+      ACCEPTANCE_ASTERISK_HOST: asterisk
+      ACCEPTANCE_ASTERISK_PORT: "5060"
+      ACCEPTANCE_AMI_PORT: "5038"
+      ACCEPTANCE_ADMIN_USERNAME: synthetic-admin
+      ACCEPTANCE_ADMIN_PASSWORD: ${ACCEPTANCE_ADMIN_PASSWORD:?Set synthetic acceptance admin password}
+      ACCEPTANCE_CONFIG_DIR: /shared-config-control
+      ACCEPTANCE_ARTIFACT_DIR: /artifacts
+      ACCEPTANCE_EXPECT_ROLLBACK: ${ACCEPTANCE_EXPECT_ROLLBACK:-true}
+      AMI_USERNAME: ${AMI_USERNAME:-visualpbx}
+      AMI_SECRET: ${AMI_SECRET:?Set synthetic AMI secret}
+    volumes:
+      - asterisk-generated:/shared-config-control
+      - acceptance-artifacts:/artifacts
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+      asterisk:
+        condition: service_healthy
+
+volumes:
+  acceptance-artifacts:

@@ -77,6 +77,7 @@ describe('parseWav', () => {
 
   test('rejects a truncated file', () => {
     assert.throws(() => parseWav(Buffer.alloc(10)), SoundValidationError);
+    assert.throws(() => parseWav(wav().subarray(0, 60)), /abgeschnitten/);
   });
 });
 
