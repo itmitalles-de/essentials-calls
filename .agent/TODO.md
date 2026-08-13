@@ -14,10 +14,8 @@
   cleanup, sound GID handling, and stricter AMI environment validation.
 - [ ] Review the final diff for secrets, generated artifacts, inconsistent
   branding, stale claims, and unintended package/repository renames.
-- [ ] Commit the remaining verified changes coherently, push
-  `agent/essentials-calls-autonomous`, and open a new draft pull request.
-- [ ] Inspect GitHub checks on that draft and address concrete failures; do not
-  merge automatically.
+- [ ] After the requested direct merge/push, inspect the `master` GitHub checks
+  and address concrete failures. No new draft PR is required for this snapshot.
 
 ## Blocked
 

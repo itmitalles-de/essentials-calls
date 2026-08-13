@@ -72,7 +72,8 @@ customer NAT/firewall, or production behavior has been verified. See
 
 ## Publication state
 
-The branch contains a local hardening snapshot commit (see `git log`). It has
-not been pushed and no new draft PR has been opened. Existing GitHub draft PR
-#2 is unrelated and must not be merged or repurposed. The exact unfinished work
-is recorded in `.agent/TODO.md`.
+The hardening snapshot is committed locally. On 2026-08-13 the user explicitly
+requested a direct merge/push/sync rather than the earlier planned draft PR;
+the next operation therefore fast-forwards `master` after refreshing its remote
+state. Existing GitHub draft PR #2 is unrelated and must not be merged or
+repurposed. The exact unfinished technical work is recorded in `.agent/TODO.md`.
