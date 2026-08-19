@@ -75,7 +75,7 @@ npm run test:full-stack
 npm run test:e2e
 npm run test:backup-restore
 npm run scan:secrets
-npm run sbom > essentials-calls-npm.cdx.json
+npm run --silent sbom > essentials-calls-npm.cdx.json
 git diff --check
 ```
 
