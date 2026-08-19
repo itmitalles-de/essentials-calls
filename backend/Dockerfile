@@ -1,5 +1,5 @@
 # Build context: repo root (needs the shared/ workspace package)
-FROM node:20-bookworm-slim AS build
+FROM node:24.19.0-bookworm-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03 AS build
 WORKDIR /repo
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
@@ -13,7 +13,7 @@ COPY shared shared
 COPY backend backend
 RUN npm run build -w shared && npm run build -w backend
 
-FROM node:20-bookworm-slim
+FROM node:24.19.0-bookworm-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03
 WORKDIR /repo
 COPY --from=build /repo/node_modules ./node_modules
 COPY --from=build /repo/package.json ./package.json

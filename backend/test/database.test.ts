@@ -151,4 +151,72 @@ describe('AEAD secret integrity and rotation', () => {
     assert.doesNotThrow(() => database.materializedTopology());
     database.close();
   });
+
+  test('rolls an interrupted rotation back to one repairable old-key state', () => {
+    const dir = tempDir();
+    const original = cipher(12);
+    const replacement = cipher(13);
+    const database = new PbxDatabase(dir, original);
+    database.db.exec(`
+      CREATE TRIGGER synthetic_interrupt_rotation
+      BEFORE UPDATE ON sip_secrets
+      WHEN OLD.node_id = 'ext-102'
+      BEGIN
+        SELECT RAISE(ABORT, 'synthetic interrupted rotation');
+      END;
+    `);
+    assert.throws(
+      () => database.rotateSecrets(original, replacement, { id: null, username: 'interrupted-rotation' }),
+      /synthetic interrupted rotation/
+    );
+    database.db.exec('DROP TRIGGER synthetic_interrupt_rotation');
+    assert.doesNotThrow(() => database.materializedTopology(), 'the old key must still read every row after rollback');
+    assert.ok(
+      (database.db.prepare('SELECT DISTINCT key_id FROM sip_secrets').all() as Array<{ key_id: string }>).every(
+        (row) => row.key_id === original.id
+      ),
+      'an interrupted transaction must not leave mixed key IDs'
+    );
+    assert.equal(
+      database.listAudit().some((entry) => entry.action === 'secret.rotate-master-key' && entry.actor === 'interrupted-rotation'),
+      false,
+      'a rolled-back rotation must not leave a success audit event'
+    );
+    database.close();
+
+    const staleNewKey = new PbxDatabase(dir, replacement);
+    assert.throws(() => staleNewKey.materializedTopology(), SecretDecryptionError);
+    staleNewKey.close();
+  });
+
+  test('keeps the old in-memory key when the final rotation audit step aborts', () => {
+    const dir = tempDir();
+    const original = cipher(14);
+    const replacement = cipher(15);
+    const database = new PbxDatabase(dir, original);
+    database.db.exec(`
+      CREATE TRIGGER synthetic_interrupt_rotation_audit
+      BEFORE INSERT ON audit_events
+      WHEN NEW.action = 'secret.rotate-master-key'
+      BEGIN
+        SELECT RAISE(ABORT, 'synthetic interrupted rotation audit');
+      END;
+    `);
+    assert.throws(
+      () => database.rotateSecrets(original, replacement, { id: null, username: 'interrupted-audit' }),
+      /synthetic interrupted rotation audit/
+    );
+    database.db.exec('DROP TRIGGER synthetic_interrupt_rotation_audit');
+    assert.doesNotThrow(
+      () => database.materializedTopology(),
+      'the live database object must retain the old cipher after rollback'
+    );
+    assert.ok(
+      (database.db.prepare('SELECT DISTINCT key_id FROM sip_secrets').all() as Array<{ key_id: string }>).every(
+        (row) => row.key_id === original.id
+      ),
+      'the aborted final audit step must roll every encrypted row back'
+    );
+    database.close();
+  });
 });

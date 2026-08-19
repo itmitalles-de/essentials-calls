@@ -84,6 +84,11 @@ Rotation is an explicit offline administrative operation:
 Rotation decrypts and re-encrypts all SIP values in one SQLite transaction and
 audits only the count and non-secret key ID.
 
+The automated A/B/C rehearsal proves that an unrelated or obsolete key fails
+closed, a matching key restores every encrypted value, rotation is atomic, and
+an injected interruption leaves a consistent old-key-repairable database. See
+[operations/MASTER_KEY_RECOVERY.md](operations/MASTER_KEY_RECOVERY.md).
+
 ## HTTP and logging
 
 Helmet protects API responses. nginx adds CSP, frame denial, no-sniff,
@@ -94,7 +99,18 @@ deployment responsibility.
 Audit detail redacts keys matching password, secret, token, ciphertext,
 authorization, or cookie. Request errors are generic at the 500 boundary.
 Synthetic failure artifacts redact credential-like fields and are created only
-on failed acceptance runs.
+on failed acceptance runs. CI uploads only those redacted paths for three days;
+the normal backup archive and master key are never CI artifacts. A tracked-file
+high-confidence secret scan complements review but is not a substitute for a
+managed secret scanner or incident response.
+
+## Emergency and external-routing boundary
+
+The application rejects extension numbers `110` and `112`, rejects disabled
+`trunk`/`external` nodes, generates no carrier context, and has no automatic
+outside line or fallback. This is a fail-closed absence of support, not an
+emergency-service implementation. A future isolated test-DID adapter must use a
+positive destination allowlist; a blacklist cannot be its sole control.
 
 ## Known security limits
 
@@ -104,3 +120,10 @@ on failed acceptance runs.
   passwords are chosen.
 - Voicemail policy, customer firewall/NAT, abuse prevention, emergency calls,
   carrier fraud controls, and public exposure are outside the local proof.
+- Asterisk 18 is retained by explicit product constraint although its upstream
+  support has ended; this is a production blocker, not an accepted production
+  risk.
+- Repository Dependabot/vulnerability alerts and enforced SHA-pinning policy
+  are not enabled, and no container CVE scanner is configured. CI pins its own
+  action uses and base images and emits an npm SBOM, but repository settings and
+  image-vulnerability governance remain external pilot gates.

@@ -288,6 +288,13 @@ function validateNodes(topology: Topology, options: ValidationOptions): Validati
           message: `Extension "${ext.label}" hat keine gültige Nummer (nur Ziffern erlaubt).`,
           nodeId: node.id,
         });
+      } else if (number === '110' || number === '112') {
+        issues.push({
+          severity: 'error',
+          code: 'reserved-emergency-number',
+          message: `Nummer "${number}" ist als Notrufnummer reserviert und wird von diesem PoC weder intern noch extern geroutet.`,
+          nodeId: node.id,
+        });
       } else if (numberOwners.has(number)) {
         issues.push({
           severity: 'error',

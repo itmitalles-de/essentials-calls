@@ -40,16 +40,27 @@ generated-config targets. Before copying anything it:
 7. records a restore audit event.
 
 Only then are the database, sounds, generated versions, and known-good links
-copied into their empty targets. A corrupt archive, wrong key, or non-empty
-destination leaves the target untouched.
+copied into their empty targets. Restored sessions are invalidated and custom
+sound directories/files retain mode `0750`/`0640` with the configured Asterisk
+reader group. A corrupt archive, wrong key, or non-empty destination leaves the
+target untouched.
 
 ## Automated evidence
 
-`npm run test:backup-restore` starts an isolated source stack, imports and
-deploys a synthetic topology, executes synthetic calls, creates an archive,
-checks its manifest, restores into separate empty volumes, and then repeats
-registration, direct call, ring group, queue, schedule, IVR, CDR, and WebSocket
-checks against the restored target.
+`npm run test:backup-restore` starts an isolated source stack, creates three
+users/roles plus immutable/deployed revisions and a custom synthetic WAV,
+executes synthetic calls, and checks archive contents, checksums, key exclusion,
+encrypted credentials, audit, and file modes. Restore with unrelated key B must
+fail before target population. Restore with A then proves session invalidation,
+non-persistence of ephemeral AMI state, Asterisk startup, all semantic routes,
+custom IVR playback and observed RTP.
+
+The same rehearsal atomically rotates A to C, verifies every encrypted value,
+creates a new backup, requires obsolete A to fail, restores with C into another
+set of empty volumes, and repeats recovery/runtime assertions. Unit injection of
+an interrupted rotation proves transaction rollback leaves an unambiguous
+old-key-repairable state. Audit contains restore/rotation facts but no key value.
+See [operations/MASTER_KEY_RECOVERY.md](operations/MASTER_KEY_RECOVERY.md).
 
 This proves deterministic local recovery only. It does not prove off-site
 retention, restore-time objectives, production storage durability, carrier

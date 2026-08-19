@@ -118,12 +118,31 @@ function assertEmpty(directory: string, label: string): void {
   if (fs.readdirSync(directory).length > 0) throw new Error(`${label} muss für einen Restore leer sein: ${directory}`);
 }
 
+function applySoundPermissions(directory: string, readerGid: number): void {
+  if (!Number.isSafeInteger(readerGid) || readerGid < 0) {
+    throw new Error('SOUNDS_READER_GID muss eine nichtnegative Ganzzahl sein.');
+  }
+  const visit = (entryPath: string): void => {
+    const entry = fs.lstatSync(entryPath);
+    if (entry.isSymbolicLink()) return;
+    fs.chownSync(entryPath, -1, readerGid);
+    if (entry.isDirectory()) {
+      fs.chmodSync(entryPath, 0o750);
+      for (const child of fs.readdirSync(entryPath)) visit(path.join(entryPath, child));
+    } else if (entry.isFile()) {
+      fs.chmodSync(entryPath, 0o640);
+    }
+  };
+  visit(directory);
+}
+
 export async function restoreBackup(options: {
   archivePath: string;
   dataDir: string;
   soundsDir: string;
   configDir: string;
   cipher: SecretCipher;
+  soundsReaderGid?: number;
 }): Promise<BackupManifest> {
   assertEmpty(options.dataDir, 'DATA_DIR');
   assertEmpty(options.soundsDir, 'SOUNDS_DIR');
@@ -174,6 +193,7 @@ export async function restoreBackup(options: {
     fs.mkdirSync(options.configDir, { recursive: true });
     copyIfExists(path.join(staging, 'sounds'), options.soundsDir);
     copyIfExists(path.join(staging, 'generated'), options.configDir);
+    if (options.soundsReaderGid !== undefined) applySoundPermissions(options.soundsDir, options.soundsReaderGid);
     return manifest;
   } finally {
     fs.rmSync(staging, { recursive: true, force: true });

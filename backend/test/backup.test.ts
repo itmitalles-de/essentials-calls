@@ -10,6 +10,24 @@ import { SecretCipher, SecretDecryptionError } from '../src/security/crypto';
 const roots: string[] = [];
 const key = SecretCipher.fromEncoded(Buffer.alloc(32, 11).toString('base64'));
 
+function syntheticWav(): Buffer {
+  const samples = 80;
+  const output = Buffer.alloc(44 + samples * 2);
+  output.write('RIFF', 0);
+  output.writeUInt32LE(36 + samples * 2, 4);
+  output.write('WAVEfmt ', 8);
+  output.writeUInt32LE(16, 16);
+  output.writeUInt16LE(1, 20);
+  output.writeUInt16LE(1, 22);
+  output.writeUInt32LE(8000, 24);
+  output.writeUInt32LE(16000, 28);
+  output.writeUInt16LE(2, 32);
+  output.writeUInt16LE(16, 34);
+  output.write('data', 36);
+  output.writeUInt32LE(samples * 2, 40);
+  return output;
+}
+
 function root(): string {
   const value = fs.mkdtempSync(path.join(os.tmpdir(), 'essentials-calls-backup-test-'));
   roots.push(value);
@@ -27,10 +45,16 @@ describe('backup and empty restore', () => {
     const current = database.currentTopology();
     const changed = structuredClone(current.topology);
     changed.name = 'Backed up revision';
-    database.saveTopology(changed, current.revision, { id: 'editor', username: 'editor', role: 'editor' }, 'backup evidence');
+    const saved = database.saveTopology(changed, current.revision, { id: 'editor', username: 'editor', role: 'editor' }, 'backup evidence');
+    database.markDeploymentActive(saved.revision);
+    const systemActor = { id: null, username: 'backup-test' };
+    const admin = database.createUser('recovery-admin', 'synthetic-hash', 'admin', systemActor);
+    database.createUser('recovery-editor', 'synthetic-hash', 'editor', systemActor);
+    database.createUser('recovery-viewer', 'synthetic-hash', 'viewer', systemActor);
+    database.createSession(admin.id, 'synthetic-session-hash', 'synthetic-csrf', Date.now(), Date.now() + 60_000);
     const sounds = path.join(source, 'sounds');
-    fs.mkdirSync(sounds);
-    fs.writeFileSync(path.join(sounds, 'synthetic.wav'), Buffer.from('synthetic-audio-placeholder'));
+    fs.mkdirSync(sounds, { mode: 0o750 });
+    fs.writeFileSync(path.join(sounds, 'synthetic.wav'), syntheticWav(), { mode: 0o640 });
     const generated = path.join(source, 'generated');
     fs.mkdirSync(path.join(generated, 'versions', 'good'), { recursive: true });
     fs.writeFileSync(path.join(generated, 'versions', 'good', 'extensions_generated.conf'), '[internal]\n');
@@ -47,15 +71,30 @@ describe('backup and empty restore', () => {
     const targetData = path.join(target, 'data');
     const targetSounds = path.join(target, 'sounds');
     const targetGenerated = path.join(target, 'generated');
-    await restoreBackup({ archivePath: archive, dataDir: targetData, soundsDir: targetSounds, configDir: targetGenerated, cipher: key });
+    await restoreBackup({
+      archivePath: archive,
+      dataDir: targetData,
+      soundsDir: targetSounds,
+      configDir: targetGenerated,
+      cipher: key,
+      soundsReaderGid: process.getgid?.(),
+    });
     const restored = new PbxDatabase(targetData, key);
     assert.equal(restored.currentTopology().topology.name, 'Backed up revision');
+    assert.equal(restored.currentTopology().activeRevision, saved.revision);
+    assert.equal(restored.currentTopology().lastGoodRevision, saved.revision);
     assert.equal(restored.materializedTopology().nodes.find((node) => node.id === 'ext-101')?.type === 'extension' &&
       restored.materializedTopology().nodes.find((node) => node.id === 'ext-101')!.properties.sipPassword, 'synthetic-alice-101');
     assert.ok(restored.listRevisions().length >= 2);
     assert.ok(restored.listAudit().some((entry) => entry.action === 'backup.restore'));
-    assert.equal(fs.readFileSync(path.join(targetSounds, 'synthetic.wav'), 'utf8'), 'synthetic-audio-placeholder');
+    assert.deepEqual(new Set(restored.listUsers().map((user) => user.role)), new Set(['admin', 'editor', 'viewer']));
+    assert.equal((restored.db.prepare('SELECT COUNT(*) AS count FROM sessions').get() as { count: number }).count, 0);
+    assert.equal(fs.readFileSync(path.join(targetSounds, 'synthetic.wav')).subarray(0, 4).toString('ascii'), 'RIFF');
+    assert.equal(fs.statSync(targetSounds).mode & 0o777, 0o750);
+    assert.equal(fs.statSync(path.join(targetSounds, 'synthetic.wav')).mode & 0o777, 0o640);
     assert.equal(fs.readlinkSync(path.join(targetGenerated, 'current')), 'versions/good');
+    const tableNames = (restored.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>).map((row) => row.name);
+    assert.equal(tableNames.some((name) => /^(ami|runtime|node_status)/i.test(name)), false);
     restored.close();
   });
 
@@ -115,5 +154,95 @@ describe('backup and empty restore', () => {
       })
     );
     assert.equal(fs.existsSync(path.join(target, 'data', 'essentials-calls.sqlite3')), false);
+  });
+
+  test('rehearses A to C rotation, wrong-key failure and a new empty restore', async () => {
+    const encodedA = Buffer.alloc(32, 21).toString('base64');
+    const encodedB = Buffer.alloc(32, 22).toString('base64');
+    const encodedC = Buffer.alloc(32, 23).toString('base64');
+    const cipherA = SecretCipher.fromEncoded(encodedA);
+    const cipherB = SecretCipher.fromEncoded(encodedB);
+    const cipherC = SecretCipher.fromEncoded(encodedC);
+    const source = root();
+    const database = new PbxDatabase(path.join(source, 'data'), cipherA);
+    const backupA = path.join(source, 'backup-a.tar.gz');
+    await createBackup({ database, soundsDir: path.join(source, 'sounds'), configDir: path.join(source, 'generated'), outputPath: backupA });
+
+    const wrongB = root();
+    await assert.rejects(
+      restoreBackup({
+        archivePath: backupA,
+        dataDir: path.join(wrongB, 'data'),
+        soundsDir: path.join(wrongB, 'sounds'),
+        configDir: path.join(wrongB, 'generated'),
+        cipher: cipherB,
+      }),
+      SecretDecryptionError
+    );
+    assert.equal(fs.existsSync(path.join(wrongB, 'data', 'essentials-calls.sqlite3')), false);
+
+    const restoredA = root();
+    await restoreBackup({
+      archivePath: backupA,
+      dataDir: path.join(restoredA, 'data'),
+      soundsDir: path.join(restoredA, 'sounds'),
+      configDir: path.join(restoredA, 'generated'),
+      cipher: cipherA,
+    });
+    const readableA = new PbxDatabase(path.join(restoredA, 'data'), cipherA);
+    assert.doesNotThrow(() => readableA.materializedTopology());
+    readableA.close();
+
+    const rotated = database.rotateSecrets(cipherA, cipherC, { id: null, username: 'rotation-rehearsal' });
+    assert.ok(rotated > 0);
+    assert.doesNotThrow(() => database.materializedTopology());
+    const rotationAudit = database.listAudit().find((entry) => entry.action === 'secret.rotate-master-key');
+    assert.ok(rotationAudit);
+    const auditText = JSON.stringify(rotationAudit);
+    assert.ok(!auditText.includes(encodedA) && !auditText.includes(encodedC));
+
+    const backupC = path.join(source, 'backup-c.tar.gz');
+    const manifestC = await createBackup({
+      database,
+      soundsDir: path.join(source, 'sounds'),
+      configDir: path.join(source, 'generated'),
+      outputPath: backupC,
+    });
+    assert.deepEqual(manifestC.secretKeyIds, [cipherC.id]);
+    database.close();
+
+    const oldA = root();
+    await assert.rejects(
+      restoreBackup({
+        archivePath: backupC,
+        dataDir: path.join(oldA, 'data'),
+        soundsDir: path.join(oldA, 'sounds'),
+        configDir: path.join(oldA, 'generated'),
+        cipher: cipherA,
+      }),
+      SecretDecryptionError
+    );
+
+    const restoredC = root();
+    await restoreBackup({
+      archivePath: backupC,
+      dataDir: path.join(restoredC, 'data'),
+      soundsDir: path.join(restoredC, 'sounds'),
+      configDir: path.join(restoredC, 'generated'),
+      cipher: cipherC,
+    });
+    const readableC = new PbxDatabase(path.join(restoredC, 'data'), cipherC);
+    assert.doesNotThrow(() => readableC.materializedTopology());
+    assert.ok(readableC.listAudit().some((entry) => entry.action === 'secret.rotate-master-key'));
+    readableC.close();
+
+    assert.throws(() => {
+      const stale = new PbxDatabase(path.join(restoredC, 'data'), cipherA);
+      try {
+        stale.materializedTopology();
+      } finally {
+        stale.close();
+      }
+    }, SecretDecryptionError);
   });
 });
