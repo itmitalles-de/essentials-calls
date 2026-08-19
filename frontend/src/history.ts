@@ -1,79 +1,52 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
-
-function same<T>(left: T, right: T): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
-}
+import { useCallback, useMemo, useState } from 'react';
+import {
+  acceptSavedHistory,
+  emptyHistory,
+  isHistoryDirty,
+  redoHistory,
+  resetHistory,
+  undoHistory,
+  updateHistory,
+} from './historyState';
 
 export function useBoundedHistory<T>(limit = 50) {
-  const [value, setValue] = useState<T | null>(null);
-  const [version, setVersion] = useState(0);
-  const past = useRef<T[]>([]);
-  const future = useRef<T[]>([]);
-  const saved = useRef<T | null>(null);
+  const [state, setState] = useState(() => emptyHistory<T>());
 
   const reset = useCallback((next: T) => {
-    past.current = [];
-    future.current = [];
-    saved.current = next;
-    setValue(next);
-    setVersion((current) => current + 1);
+    setState(resetHistory(next));
   }, []);
 
   const update = useCallback(
     (updater: (current: T) => T) => {
-      setValue((current) => {
-        if (current === null) return current;
-        const next = updater(current);
-        if (same(current, next)) return current;
-        past.current = [...past.current.slice(-(limit - 1)), current];
-        future.current = [];
-        setVersion((entry) => entry + 1);
-        return next;
-      });
+      setState((current) => updateHistory(current, updater, limit));
     },
     [limit]
   );
 
   const undo = useCallback(() => {
-    setValue((current) => {
-      const previous = past.current.at(-1);
-      if (current === null || !previous) return current;
-      past.current = past.current.slice(0, -1);
-      future.current = [current, ...future.current].slice(0, limit);
-      setVersion((entry) => entry + 1);
-      return previous;
-    });
+    setState((current) => undoHistory(current, limit));
   }, [limit]);
 
   const redo = useCallback(() => {
-    setValue((current) => {
-      const next = future.current[0];
-      if (current === null || !next) return current;
-      future.current = future.current.slice(1);
-      past.current = [...past.current.slice(-(limit - 1)), current];
-      setVersion((entry) => entry + 1);
-      return next;
-    });
+    setState((current) => redoHistory(current, limit));
   }, [limit]);
 
   const acceptSaved = useCallback((next: T) => {
-    saved.current = next;
-    setValue(next);
-    setVersion((entry) => entry + 1);
+    setState((current) => acceptSavedHistory(current, next));
   }, []);
 
   return useMemo(
     () => ({
-      value,
+      value: state.value,
       reset,
       update,
       undo,
       redo,
       acceptSaved,
-      canUndo: past.current.length > 0,
-      canRedo: future.current.length > 0,
-      dirty: value !== null && saved.current !== null && !same(value, saved.current),
+      canUndo: state.past.length > 0,
+      canRedo: state.future.length > 0,
+      dirty: isHistoryDirty(state),
     }),
-    [value, reset, update, undo, redo, acceptSaved, version]
+    [state, reset, update, undo, redo, acceptSaved]
   );
 }
