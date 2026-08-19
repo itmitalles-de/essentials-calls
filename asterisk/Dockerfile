@@ -1,5 +1,5 @@
 # Debian bookworm dropped the "asterisk" package; Ubuntu 22.04 (universe) still ships 18.10.
-FROM ubuntu:22.04
+FROM ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -20,6 +20,6 @@ RUN chmod +x /entrypoint.sh /preflight-worker.sh
 EXPOSE 5060/udp 5038 10000-10100/udp
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
-  CMD asterisk -rx "core show uptime" > /dev/null 2>&1 || exit 1
+  CMD asterisk -rx "core waitfullybooted" > /dev/null 2>&1 || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]

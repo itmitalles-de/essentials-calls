@@ -40,6 +40,7 @@ describe('generatePjsipConf', () => {
     assert.match(conf, new RegExp(`\\[101\\]\\ntype=auth\\nauth_type=md5\\nrealm=asterisk\\nusername=101\\nmd5_cred=${digest}`));
     assert.ok(!conf.includes('pw-101'), 'generated config must not contain a plaintext SIP secret');
     assert.match(conf, /\[101\]\ntype=endpoint/);
+    assert.match(conf, /allow=ulaw,alaw\ndirect_media=no/);
     assert.match(conf, /callerid="Ext 101" <101>/);
   });
 

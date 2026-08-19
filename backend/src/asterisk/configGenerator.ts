@@ -119,6 +119,10 @@ export function generatePjsipConf(topology: Topology): string {
       'context=internal',
       'disallow=all',
       'allow=ulaw,alaw',
+      // Keep media anchored in the isolated Asterisk runtime. Besides making
+      // IVR/queue behavior deterministic, this prevents native-bridge
+      // re-INVITEs from bypassing the synthetic RTP observer.
+      'direct_media=no',
       `auth=${id}`,
       `aors=${id}`,
       `callerid="${display(callerIdName ?? ext.label)}" <${number}>`,

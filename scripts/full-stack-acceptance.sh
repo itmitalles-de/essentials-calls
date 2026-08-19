@@ -27,7 +27,7 @@ collect_failure() {
   diagnostic_dir="$REPOSITORY_ROOT/artifacts/acceptance-failure-$(date -u +%Y%m%dT%H%M%SZ)"
   mkdir -p "$diagnostic_dir"
   compose logs --no-color \
-    | sed -E 's/("?(password|secret|token|authorization|cookie)"?[[:space:]]*[:= ][[:space:]]*"?)[^",;[:space:]]+/\1[REDACTED]/Ig' \
+    | sed -E 's/("?(password|secret|token|authorization|cookie|master[_-]?key|pbx_master_key)"?[[:space:]]*[:= ][[:space:]]*"?)[^",;[:space:]]+/\1[REDACTED]/Ig' \
     > "$diagnostic_dir/compose.log"
   docker run --rm \
     -v "${COMPOSE_PROJECT_NAME}_acceptance-artifacts:/source:ro" \
@@ -69,6 +69,7 @@ compose up -d --wait --wait-timeout 120 asterisk backend frontend
 compose --profile acceptance run --rm \
   -e ACCEPTANCE_AFTER_RESTART=true \
   -e ACCEPTANCE_EXPECT_ROLLBACK=false \
+  -e ACCEPTANCE_SOURCE_EVIDENCE=/artifacts/recovery-state.json \
   acceptance
 
 completed=true
