@@ -64,6 +64,10 @@ semantic, and sound-inventory validation. A stale precondition gets HTTP 409:
 
 `POST /api/topology/validate` (`editor`) validates without writing.
 
+Validation rejects `110` and `112` as reserved emergency extension numbers and
+rejects the disabled `trunk`/`external` node types. There is no API operation
+that activates a carrier route or DID.
+
 ## Revision history
 
 - `GET /api/topology/revisions?limit=50` (`viewer`)

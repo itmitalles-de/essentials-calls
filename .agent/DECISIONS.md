@@ -1,12 +1,29 @@
 # Decisions
 
-## Product name without administrative repository migration
+## Repository rename with compatibility boundaries
 
-**Decision:** User-visible branding is Essentials+ Calls; repository/package
-namespace, default branch, and Asterisk 18 base remain unchanged.
+**Decision:** The canonical repository is `itmitalles-de/essentials-calls` and
+the product is Essentials+ Calls. Historical npm/package, persistent path,
+volume, browser-storage, AMI/test, and Asterisk identifiers remain compatible;
+the default branch stays `master` and Asterisk stays on major 18.
 
-**Reason:** The assignment explicitly separates product naming from technical
-administration and major-version migration.
+**Reason:** Public identity must match the repository rename without risking an
+unrelated workspace/data migration or orphaning installed state. The exact
+boundary is documented in `docs/COMPATIBILITY_IDENTIFIERS.md`.
+
+## Save is not an undo boundary
+
+**Decision:** Saving creates an immutable server revision and updates the local
+dirty-state baseline, but does not clear the editor's undo/redo stacks.
+
+**Reason:** Save persists current work; it is not a new editing session. Common
+editor semantics allow undoing the last domain change after save. Undo can make
+the editor dirty relative to the saved revision and redo can restore it.
+
+**Consequence:** Loading, import, rollback, and browser restart establish a new
+history root. Unit and eight-case Playwright coverage exercise node creation,
+multiple pre/post-save changes, undo/redo, graph/table switching, reload,
+revision, rollback, and a fresh browser-context persisted state.
 
 ## SQLite WAL single-tenant persistence
 
@@ -90,6 +107,17 @@ can cover the complete required contract.
 **Reason:** Partial mock behavior would encourage false carrier and emergency
 claims.
 
+## Emergency and pilot routing fail closed
+
+**Decision:** Reject `110` and `112` as extension numbers, keep
+`trunk`/`external` disabled, and generate no outside line or fallback. Any
+future isolated pilot must use a positive allowlist containing only the approved
+ordinary test destination; a blacklist alone is not sufficient.
+
+**Reason:** “Not supported” must be a technical boundary, not merely a warning.
+The current repository has no authority or evidence for emergency or carrier
+routing.
+
 ## Separate administrative backup
 
 **Decision:** Normal topology export is redacted; full backup is a CLI archive
@@ -98,3 +126,22 @@ but never the master key.
 
 **Reason:** Sharing a topology and recovering a system have different
 privileges and threat models.
+
+## Master-key recovery is an A/B/C fail-closed rehearsal
+
+**Decision:** Recovery acceptance must reject unrelated key B, restore an A
+archive only with A, atomically rotate all credentials to C, reject old A for a
+C archive, and restore C only with C. The key is never in the archive or audit.
+
+**Reason:** A green file-copy test does not prove encrypted-state recovery.
+Transactional interruption injection must leave every row consistently
+repairable with the former key rather than commit a mixed-key state.
+
+## Pinned Asterisk 18 remains a production blocker
+
+**Decision:** Do not perform a major upgrade in this stabilization branch, but
+do not treat the retained Asterisk 18 runtime as production-supported.
+
+**Reason:** The assigned product boundary requires Asterisk 18 while upstream
+support has ended. Resolving that conflict needs a separately scoped migration
+and full synthetic plus real-world requalification.

@@ -13,6 +13,10 @@ A PJSIP endpoint must be named after the SIP user. Merely placing
 `max_contacts=1`, otherwise a client restarting on a new source port is
 rejected until the former contact expires.
 
+`direct_media=no` keeps Asterisk on the synthetic audio path. This makes the
+custom-WAV/RTP assertion deterministic and avoids mistaking endpoint-to-endpoint
+media for runtime evidence; it does not prove real NAT traversal.
+
 ## No plaintext password in generated PJSIP
 
 The pinned Asterisk 18 supports legacy `auth_type=md5` and `md5_cred`, but

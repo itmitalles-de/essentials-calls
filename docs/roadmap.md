@@ -1,69 +1,83 @@
 # Status, roadmap, and blockers
 
-Status: 2026-08-13. Essentials+ Calls is a hardened, automated **local
-proof of concept**. It is not represented as a production telephone system.
+Status: 2026-08-19. Essentials+ Calls is a single-tenant callflow editor,
+simulator, and isolated synthetic Asterisk 18 runtime: a technically verified
+proof of concept, not a production PBX or telephone service.
 
-## Locally implemented and verified
+## Implemented PoC boundary
 
-- SQLite WAL persistence, one-time protected JSON migration, immutable
-  revisions, ETags/409 conflict protection, retention, audit, and rollback.
-- No-default local authentication, scrypt, HttpOnly/SameSite sessions, expiry,
-  logout, CSRF, rate limiting, server-side viewer/editor/admin authorization,
-  and admin safety rules.
-- AES-256-GCM SIP storage, redacted API/revisions/export, explicit secret
-  command, legacy migration, ciphertext/wrong-key/rotation tests, and Asterisk
-  18 HA1 generation without plaintext config.
-- Server sound inventory validation, reference listing/protected deletion,
-  deliberate replacement, and atomic WAV writes.
-- Bounded editor undo/redo, versioned import/export/schema/migration, graph and
-  table editing, theme persistence, roles, revisions, and conflict UI.
-- Schedule nodes with IANA timezone, multiple windows, weekdays, explicit
-  holidays, open/closed routes, midnight and CET/CEST handling.
-- Staged generation, isolated Asterisk preflight, atomic symlinks, targeted
-  reload, runtime canary, last-known-good rollback, and deployment audit.
-- Long-lived AMI events with heartbeat, backoff, degraded state,
-  deduplication, reconnect snapshot, polling fallback, and authenticated
-  WebSocket updates.
-- Native Asterisk queues separated from ring groups and synthetic event/call
-  coverage.
-- Checksummed backup and empty restore, separate master key, and post-restore
-  synthetic calls.
-- Stable Office discovery metadata without a shared database.
+- Extensions, IVR, ring groups, native queues, voicemail, Europe/Berlin-aware
+  schedules, immutable callflow revisions, rollback, graph/table editing, and
+  bounded save-aware undo/redo.
+- Local viewer/editor/admin accounts, scrypt passwords, sessions, CSRF, rate
+  limiting, optimistic concurrency, audit, and SQLite WAL persistence.
+- AES-256-GCM SIP-secret storage, redacted revisions/API/export, Asterisk 18 HA1
+  derivatives, atomic master-key rotation, and separate-key recovery.
+- Server-authoritative sound inventory, atomic WAV upload, generated
+  configuration, isolated preflight, atomic activation, reload canary, and
+  last-known-good rollback.
+- AMI status/events, CDR, authenticated WebSocket updates, and ephemeral runtime
+  state separated from configuration.
+- Disposable SIPp/Asterisk, Chromium, and A/B/C backup/recovery acceptance with
+  synthetic identities, credentials, prompts, calls, WAV, and RTP only.
+- Fail-closed absence of external routing: `trunk`/`external` are disabled,
+  `110`/`112` are reserved, and there is no automatic outside line.
 
-See [VERIFICATION_MATRIX.md](VERIFICATION_MATRIX.md) for the exact evidence
-class and unverified columns.
+The exact evidence and its limits are in
+[VERIFICATION_MATRIX.md](VERIFICATION_MATRIX.md). A green synthetic suite does
+not promote any row to carrier, DID, public-network, or production evidence.
 
-## Blocked
+## External and production blockers
 
-These items require authority, third parties, real infrastructure, legal work,
-or an explicit separate migration. They do not block continued local quality
-work:
+The following require authority, third parties, infrastructure, or a separately
+approved engineering project:
 
-- rights and licensing status of the existing code;
-- responsibility and revenue allocation among involved people;
-- real SIP trunk integration;
-- real DID routing;
-- real endpoints/handsets and softphones;
-- emergency-call concept, location, routing, and legal obligations;
-- carrier acceptance and provider-specific behavior;
-- audio quality in a real telephone network;
-- customer firewall/NAT design and validation;
-- production operation, monitoring, incident response, patching, and support.
+- code ownership and licence rights;
+- responsibility, liability, and revenue allocation;
+- approved provider contract, dedicated test SIP access, and test DID;
+- real inbound/outbound carrier behavior and fraud/cost controls;
+- an emergency-service concept, legal assessment, location/routing design, and
+  technical proof (none is claimed here);
+- real handset/softphone, codec, caller-ID, one-/two-way audio, NAT, firewall,
+  reconnect, and provider-failure acceptance;
+- privacy, voicemail retention, support, monitoring, incident response,
+  backups, maintenance windows, and an operations owner;
+- TLS/SRTP policy, host/network hardening, image vulnerability governance,
+  dependency alerts, and enforced repository controls;
+- replacement or separately approved migration of upstream-EOL Asterisk 18,
+  followed by complete requalification; and
+- production capacity, availability, RTO/RPO, penetration, carrier, and legal
+  acceptance.
 
-Trunk/DID nodes remain disabled. No half-finished provider adapter was added
-because the required fully synthetic provider contract (registration, inbound,
-outbound, auth error, reconnect, codec negotiation, outage, routing) was not
-available. Even such a simulation would not prove real-carrier or emergency
-readiness.
+These blockers do not authorize scope expansion. Asterisk 18 remains fixed for
+this PoC stabilization even though its support status prevents production use.
 
-## Not scheduled in this scope
+## Possible next controlled milestone
 
-The documentation-only list is in [NICE_TO_HAVE.md](NICE_TO_HAVE.md). Those
-ideas have no code, dependencies, empty database tables, or implied commitment.
+Only after all external gates are evidenced, the documentation-only
+[isolated test-DID pilot plan](PILOT_TEST_DID.md) may become a separately
+approved implementation task. It requires one isolated instance, one named
+provider/DID, one positively allowlisted ordinary test destination, an approved
+maintenance window, and explicit shutdown/rollback. It forbids customers,
+emergency calls, recording, transcription, AI, and automatic production
+progression.
 
-## Release gate
+Before such a pilot, build a fully synthetic provider contract covering
+registration, inbound/outbound routing, authentication errors, reconnect,
+codec negotiation, outage, positive allowlisting, and fail-closed emergency
+denial. Simulation still would not be carrier acceptance.
 
-A future product release requires all blocked ownership/legal and operational
-items to be assigned and evidenced, plus real carrier and device verification.
-Local SIPp, AMI, CDR, Docker, and Playwright success is necessary engineering
-evidence but cannot satisfy that gate by itself.
+## Explicitly not in this milestone
+
+No production SIP trunk, real DID, `110`/`112`, billing, tariff accounting,
+multi-tenant cloud PBX, recording, transcription, AI receptionist, contact
+centre, mobile app, Kubernetes, public exposure, Asterisk major upgrade, or
+customer operation is planned or scaffolded here. See
+[NICE_TO_HAVE.md](NICE_TO_HAVE.md) for other deferred ideas.
+
+## Production release gate
+
+Production requires every blocker above to have an owner and evidence, all
+applicable synthetic and real-world matrix columns to pass on a supported
+runtime, and an explicit release decision. Neither a CI badge nor this technical
+PoC is that decision.

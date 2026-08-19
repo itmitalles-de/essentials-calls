@@ -42,6 +42,10 @@ This preserves Asterisk 18 compatibility and removes plaintext from generated
 storage. Strong random SIP passwords and restrictive file permissions remain
 necessary because HA1 permits offline guessing.
 
+Generated endpoints set `direct_media=no` so the isolated Asterisk runtime
+remains on the media path and synthetic RTP evidence is observable. This is a
+test-runtime choice, not real NAT or provider acceptance.
+
 ## Dialplan mapping
 
 - **Extension:** `Dial(PJSIP/<endpoint>,20)`, then its fallback or embedded
@@ -61,6 +65,11 @@ necessary because HA1 permits offline guessing.
 Every node also receives a synthetic entrypoint starting at 600. These are
 local test aids, not DIDs. The validator warns if an internal extension shadows
 one.
+
+No trunk or external context is generated. `110` and `112` cannot be extension
+numbers, and there is no automatic outside-line or emergency fallback. The
+future pilot plan requires an explicit positive allowlist; it is not part of
+this mapping.
 
 ## Staging, preflight, and activation
 

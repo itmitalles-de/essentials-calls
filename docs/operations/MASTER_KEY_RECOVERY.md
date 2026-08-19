@@ -34,10 +34,12 @@ uses generated non-production values and fresh Compose projects/volumes:
 10. restore into another empty target with C and repeat state plus callflow
     verification.
 
-The unit suite additionally injects an interruption during rotation. Because
-re-encryption and the rotation audit use one SQLite transaction, the partial
-write rolls back: all rows remain consistently readable with A, no mixed key
-set is committed, and a later retry is unambiguous.
+The unit suite additionally injects interruptions both during row updates and
+at the final audit insert. Because re-encryption and the rotation audit use one
+SQLite transaction and the process-local cipher changes only after commit, the
+partial write rolls back: all rows and the live process remain consistently
+readable with A, no mixed key set is committed, and a later retry is
+unambiguous.
 
 ## Operator procedure
 
