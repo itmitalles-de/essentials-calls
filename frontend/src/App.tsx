@@ -68,6 +68,9 @@ function Login({ onLogin }: { onLogin: (session: AuthSession) => void }) {
       <form className="login-card" onSubmit={submit} aria-label="Anmeldung">
         <h1>Essentials+ Calls</h1>
         <p>Sichere lokale Administration</p>
+        <p className="poc-status" role="note">
+          Technischer PoC · synthetisch getestet · keine produktive PBX, keine realen Trunks, DIDs oder Notrufe
+        </p>
         <label>
           Benutzername
           <input name="username" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} />
@@ -344,6 +347,10 @@ export default function App() {
         {importPreview && <span role="status">{importPreview}</span>}
         {isAdmin && importCandidate !== undefined && <button onClick={applyCandidate}>Geprüften Import anwenden</button>}
         {operation.kind !== 'idle' && <span role={operation.kind === 'error' ? 'alert' : 'status'} className={operation.kind === 'error' ? 'error-text' : ''}>{operation.message}</span>}
+      </div>
+
+      <div className="poc-status poc-status-banner" role="note">
+        Technischer PoC · synthetisch getestet · keine produktive PBX, keine realen Trunks, DIDs, Notrufe oder Carrier-/NAT-Audio-Abnahme · Rechte und Revenue offen
       </div>
 
       <main className="app-main">

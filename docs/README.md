@@ -1,8 +1,9 @@
 # Essentials+ Calls documentation
 
-This documentation describes the hardened local proof of concept as of
-2026-08-13. The technical repository remains `visual-pbx`, and Asterisk stays
-on the existing 18.x base.
+This documentation describes the isolated technical proof of concept as of
+2026-08-19. The canonical repository is
+`itmitalles-de/essentials-calls`. Asterisk stays on the required 18.x base;
+historical npm/data identifiers remain only for compatibility.
 
 Start with:
 
@@ -14,6 +15,11 @@ Start with:
 - [security.md](security.md) for sessions, authorization, and SIP secrets;
 - [operations.md](operations.md) for local operation and automated acceptance;
 - [backup-restore.md](backup-restore.md) for recovery and key handling;
+- [operations/MASTER_KEY_RECOVERY.md](operations/MASTER_KEY_RECOVERY.md) for
+  wrong-key, rotation, and interrupted-rotation recovery;
+- [COMPATIBILITY_IDENTIFIERS.md](COMPATIBILITY_IDENTIFIERS.md) for retained
+  internal identifiers after the repository rename;
+- [PILOT_TEST_DID.md](PILOT_TEST_DID.md) for future isolated pilot gates, not a rollout;
 - [VERIFICATION_MATRIX.md](VERIFICATION_MATRIX.md) for evidence boundaries;
 - [roadmap.md](roadmap.md) for blocked production work; and
 - [NICE_TO_HAVE.md](NICE_TO_HAVE.md) for explicitly deferred ideas.

@@ -2,10 +2,12 @@
 
 ## Product and repository boundary
 
-The visible product is **Essentials+ Calls**. The repository, npm namespace,
-default branch, and Asterisk 18 base remain the independent `visual-pbx`
-technical implementation. There is no shared Essentials+ Office database or
-copied Office component.
+The product is **Essentials+ Calls** and the canonical repository is
+`itmitalles-de/essentials-calls`. The historical npm namespace, persistent
+identifiers, `master` branch, and required Asterisk 18 base remain separate
+compatibility boundaries documented in
+[COMPATIBILITY_IDENTIFIERS.md](COMPATIBILITY_IDENTIFIERS.md). There is no
+shared Essentials+ Office database or copied Office component.
 
 ## Runtime components
 
@@ -75,9 +77,12 @@ revision. Current, active, and last-known-good revisions are protected from
 retention pruning.
 
 The frontend's bounded history tracks node, edge, membership, and property
-changes. Selection and viewport moves do not create history. Loading/importing/
-rolling back resets history; saving updates the saved baseline without erasing
-valid undo state.
+changes. Selection and viewport moves do not create history. Loading, importing,
+and rolling back reset history. Saving creates a revision and updates the
+dirty-state baseline, but deliberately does not erase undo or redo: save is not
+an editor-history boundary. Undo after save can therefore make the editor dirty
+by returning to a topology that predates that revision. Reloading always loads
+the persisted current revision as a fresh history root.
 
 ## Atomic deploy protocol
 
@@ -122,7 +127,9 @@ contain no topology, user, credential, or call data.
 
 ## Trust boundary
 
-This architecture hardens a local single-tenant proof of concept. TLS
+This architecture hardens a local single-tenant proof of concept. External
+routes are absent by default; reserved `110`/`112` extension numbers fail
+validation and no automatic outside-line or emergency fallback exists. TLS
 termination, production network segmentation, real carrier behavior, DID and
 emergency routing, legal responsibility, physical endpoints, and operational
 acceptance remain external.

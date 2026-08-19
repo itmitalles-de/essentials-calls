@@ -1,14 +1,22 @@
 # Essentials+ Calls
 
-Essentials+ Calls is a visual editor and hardened local runtime for internal
-Asterisk call flows. The technical repository remains `visual-pbx`; the
-product name does not rename the repository, package namespace, default branch,
-or pinned Asterisk 18 base.
+Essentials+ Calls is a visual callflow editor, simulator, and isolated
+synthetic Asterisk 18 runtime. Its canonical repository is
+`itmitalles-de/essentials-calls`.
 
-The stack is an extensively tested proof of concept, not a production PBX. Its
+The stack is an extensively synthetically tested technical proof of concept,
+not a production PBX or public telephone service. Its
 automated evidence uses disposable Docker environments, SIPp endpoints, AMI,
 CDR events, and headless browsers. It does **not** establish real trunk, DID,
 emergency-call, carrier, NAT/firewall, handset, or production readiness.
+There is no promise that `110`, `112`, or any emergency service is reachable;
+reserved emergency extension numbers and unconfigured external routing fail
+closed.
+
+The historical npm scope, persistent data/volume names, Asterisk paths, and
+`master` branch remain compatibility identifiers; see
+[Compatibility identifiers](docs/COMPATIBILITY_IDENTIFIERS.md). They are not
+the repository or product name.
 
 ## Implemented
 
@@ -47,9 +55,10 @@ emergency-call, carrier, NAT/firewall, handset, or production readiness.
    default credentials.
 5. Open <http://127.0.0.1:8080>.
 
-Do not expose this Compose stack publicly. Production requires HTTPS,
-`PBX_ENV=production`, `PBX_SECURE_COOKIES=true`, an external firewall/NAT
-design, carrier acceptance, and the other blocked work listed in the roadmap.
+Do not expose this Compose stack publicly. Changing environment flags does not
+make it production-ready. Rights/licensing, responsibility/revenue allocation,
+provider contracts, real trunk/DID, emergency handling, firewall/NAT/audio,
+carrier acceptance, monitoring, and operations remain external blockers.
 
 ## Automated verification
 
@@ -61,14 +70,20 @@ npm test
 npm run build
 docker compose config --quiet
 docker compose -f docker-compose.yml -f docker-compose.acceptance.yml --profile acceptance config --quiet
+docker compose -f docker-compose.yml -f docker-compose.acceptance.yml --profile acceptance build
 npm run test:full-stack
 npm run test:e2e
 npm run test:backup-restore
+npm run scan:secrets
+npm run sbom > essentials-calls-npm.cdx.json
+git diff --check
 ```
 
-The runtime suites create isolated Compose projects, use only synthetic
-credentials and calls, collect redacted diagnostics only on failure, and remove
-their containers and volumes afterward.
+The runtime suites create isolated Compose projects and fresh volumes, use only
+synthetic credentials/calls/prompts, collect redacted diagnostics only on
+failure, and remove their containers and volumes afterward. Browser, Asterisk,
+SIPp, and recovery passes are distinct evidence classes; none is carrier or
+production acceptance.
 
 ## Repository layout
 
@@ -94,12 +109,16 @@ their containers and volumes afterward.
 | [Security](docs/security.md) | Threat boundary, sessions, secrets, headers, and key rotation |
 | [Operations](docs/operations.md) | Configuration, bootstrap, tests, diagnostics, and recovery |
 | [Backup/restore](docs/backup-restore.md) | Archive contents, separate key, checksums, and empty restore |
+| [Master-key recovery](docs/operations/MASTER_KEY_RECOVERY.md) | Wrong-key, rotation, interrupted rotation, and A/B/C rehearsal |
 | [Verification matrix](docs/VERIFICATION_MATRIX.md) | What each evidence class proves and does not prove |
 | [Roadmap and blockers](docs/roadmap.md) | Verified scope and external/legal blockers |
+| [Compatibility identifiers](docs/COMPATIBILITY_IDENTIFIERS.md) | Internal names intentionally retained after the repository rename |
+| [Test-DID pilot plan](docs/PILOT_TEST_DID.md) | Future isolated pilot gates; no rollout or credentials |
 | [Nice-to-have](docs/NICE_TO_HAVE.md) | Explicitly deferred ideas, without scaffolding |
 
 ## License and responsibility
 
-This work does not change the repository license. Rights/licensing of the
-existing code and responsibility/revenue allocation among involved people
-remain external blockers and must be resolved before a product release.
+This work does not establish or change the repository's licensing rights.
+Rights/licensing of the existing code and responsibility/revenue allocation
+among involved people remain unresolved external blockers. No green badge or
+synthetic test result is a production release approval.

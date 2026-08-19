@@ -22,13 +22,20 @@ Demand-load only when relevant:
 
 ## Claude-specific notes
 
-- Do not infer production safety from the working proof of concept. Authentication,
-  secret storage, public-network hardening, locking, and history are absent.
+- Do not infer production safety from the working proof of concept. Local
+  authentication, encrypted SIP secrets, optimistic concurrency, and revision
+  history exist; carrier, DID, emergency, public-network, legal, and operational
+  acceptance do not.
 - Treat every topology request as untrusted and preserve backend validation.
 - Asterisk configuration loading cleanly is not sufficient validation; use the
   focused runtime checks in `docs/operations.md` when behavior changes.
 - Do not read all frontend or Asterisk files unless the task crosses those areas.
 - Never place credentials, `.env` contents, recordings, or backups in agent docs.
+- Preserve the compatibility identifiers listed in
+  `docs/COMPATIBILITY_IDENTIFIERS.md`; public repository references use
+  `itmitalles-de/essentials-calls`.
+- Do not enable trunk/external routing or emergency behavior. A future pilot
+  requires the positive allowlist and external gates in `docs/PILOT_TEST_DID.md`.
 
 Useful commands:
 
@@ -37,6 +44,10 @@ npm test
 npm run typecheck
 npm run build
 docker compose config
+npm run test:full-stack
+npm run test:e2e
+npm run test:backup-restore
+npm run scan:secrets
 ```
 
 Before finishing substantial work, validate and update `.agent/STATE.md` and

@@ -1,8 +1,9 @@
 # Follow-up Codex prompt
 
-Work autonomously in `itmitalles-de/visual-pbx`. Preserve the visible product
-name **Essentials+ Calls**, while keeping the repository/package namespace,
-default branch, and Asterisk 18 base technically unchanged.
+Work autonomously in `itmitalles-de/essentials-calls`. Preserve the product
+name **Essentials+ Calls**, the compatibility identifiers documented in
+`docs/COMPATIBILITY_IDENTIFIERS.md`, default branch `master`, and required
+Asterisk 18 base.
 
 First read `AGENTS.md`, `.agent/STATE.md`, `.agent/TODO.md`, the decisions
 and architecture handoff, and `docs/VERIFICATION_MATRIX.md`. Preserve all
