@@ -125,8 +125,13 @@ positive destination allowlist; a blacklist cannot be its sole control.
 - Asterisk 22 LTS is upstream-supported, but that removes only the former
   runtime-EOL blocker. It does not establish carrier, network, security, legal,
   operational, or production acceptance.
-- Repository Dependabot/vulnerability alerts and enforced SHA-pinning policy
-  are not enabled, and no container CVE scanner is configured. CI pins its own
-  action uses and base images and emits npm plus pinned Asterisk-source SBOMs,
-  but repository settings and image-vulnerability governance remain external
-  pilot gates.
+- GitHub enforces full action SHAs; Dependabot vulnerability alerts and
+  automated security fixes are enabled, and weekly npm/action/Docker updates
+  are configured for the default branch. Managed secret and code scanning are
+  unavailable while GitHub Advanced Security is disabled, so the narrower
+  tracked-file scanner must not be represented as equivalent coverage.
+- Checksum-pinned Trivy 0.74.0 scans only already-built local images and blocks
+  every new or fixable HIGH/CRITICAL issue. The pinned Debian snapshot still
+  has 15 unique unfixed IDs (30 backend and 33 SIPp-image occurrences). Their
+  exact package-scoped exception expires on 2026-09-20; this residual risk and
+  its renewal/remediation are production blockers.

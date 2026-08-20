@@ -70,7 +70,10 @@ npm test
 npm run build
 docker compose config --quiet
 docker compose -f docker-compose.yml -f docker-compose.acceptance.yml --profile acceptance config --quiet
+npm run validate:compose-images
+npm run validate:supply-chain
 docker compose -f docker-compose.yml -f docker-compose.acceptance.yml --profile acceptance build
+npm run scan:containers
 npm run test:full-stack
 npm run test:e2e
 npm run test:backup-restore

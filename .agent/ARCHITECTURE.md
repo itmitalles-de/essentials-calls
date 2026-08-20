@@ -48,6 +48,10 @@ React/nginx -> authenticated REST + WebSocket -> Express
   future pilot requires an explicit positive destination allowlist.
 - Save preserves local undo/redo while updating the dirty baseline; reload,
   import, rollback, and browser restart establish a new history root.
+- Base images use immutable digests; direct apt inputs use exact versions from
+  named Ubuntu/Debian snapshots. Node runtime images exclude package managers
+  and development dependencies. The local-image CVE gate permits only the
+  package-scoped, expiring PoC exception recorded in `.github`.
 
 ## Persistence
 

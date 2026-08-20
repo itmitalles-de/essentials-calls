@@ -6,9 +6,9 @@
   and isolated synthetic Asterisk 22 LTS technical proof of concept.
 - Canonical repository: `itmitalles-de/essentials-calls`; default branch:
   `master`; stabilization branch: `stabilize/calls-verified-poc`.
-- Baseline: `d88e8e54e7591bedd667e072737426c840c4160d`; verified tree:
-  `4a907716a702fad76bdc6970a8f44fcfcba4beb5`; Asterisk runtime-content
-  commit: `4a5bad7afe6768163e8ba6e24a17afe1b5ce8e6d`.
+- Baseline: `d88e8e54e7591bedd667e072737426c840c4160d`; current locally verified
+  implementation tree: `fd4c58df2e47ad59bb78b7da2e782a251ab13aed`; Asterisk
+  runtime-content commit: `4a5bad7afe6768163e8ba6e24a17afe1b5ce8e6d`.
 - Historical npm, data, volume, browser-storage, AMI/test, Asterisk-path, and
   branch identifiers remain only as documented compatibility identifiers.
 - The user's later authorization superseded the original Asterisk-18 boundary.
@@ -40,6 +40,15 @@
   the actual base/head range; the acceptance diagnostic helper image is digest
   pinned. Compose build outputs use explicit version tags in isolated project
   namespaces, and CI rejects implicit or explicit `latest` tags.
+- Ubuntu and Debian package resolution is frozen to named 2026-08-20 snapshots
+  with exact direct-package versions and fail-on-any-update-error behavior.
+  Backend and SIPp runtime images contain neither npm/Yarn/Corepack nor backend
+  development dependencies. A checksum-pinned Trivy 0.74.0 scan uses local
+  images only and rejects every new, expired, or fixable HIGH/CRITICAL finding.
+- GitHub now enforces full action SHAs. Dependabot vulnerability alerts and
+  automated security fixes are enabled and currently report zero alerts; the
+  weekly npm/action/Docker update configuration becomes active only from the
+  default branch after review and merge.
 
 ## Verified locally through 2026-08-20
 
@@ -52,13 +61,13 @@
   frontend, and SIPp acceptance images built from digest-pinned bases.
 - Full-stack: 28 semantic checks passed, then Asterisk/backend restart and
   exact user/role/topology/revision/audit/active-deployment persistence passed;
-  the complete successful run took 110.40 seconds.
+  the complete successful run took approximately 99 seconds.
 - Browser: Playwright 1.62.1, Chrome for Testing 151.0.7922.34, all 8 tests in
-  33.2 seconds (61.24 seconds including stack lifecycle), no skips/TODOs and no
-  unexpected console/page errors,
+  32.2 seconds (approximately 57 seconds including stack lifecycle), no
+  skips/TODOs and no unexpected console/page errors,
   unallowlisted HTTP failures, failed requests, or unhandled browser promise
   rejections.
-- Backup/recovery: 177.77 seconds; fresh source/A/C volumes and image
+- Backup/recovery: approximately 192 seconds; fresh source/A/C volumes and image
   namespaces; both wrong-key cases failed closed; valid A and C restores passed
   user/role/revision/audit,
   session invalidation, non-persisted AMI state, pre-start file modes, Asterisk
@@ -67,7 +76,10 @@
 - Secret scan including the lockfile, immutable action/image verification,
   224-component npm and 6-component Asterisk CycloneDX SBOM generation,
   worktree whitespace validation, and base-to-head PR whitespace validation
-  passed.
+  passed. Trivy found no HIGH/CRITICAL issue in Asterisk or frontend and no new
+  or fixable issue in any image. The pinned Debian snapshot has 15 unique
+  unfixed IDs (30 backend and 33 SIPp-image occurrences); their package-scoped
+  PoC exception expires on 2026-09-20 and is a visible production blocker.
 - GitHub Actions is externally blocked before any job step by the account's
   failed-payment or spending-limit gate. Repeated review-head runs show five
   zero-step failures; there is no successful final-head CI evidence yet, so PR
@@ -82,9 +94,10 @@ carrier NAT/audio behavior, customer, or production operation was used.
 Open gates include code/licence rights; responsibility and revenue allocation;
 provider contract/access/DID; privacy and emergency concepts; NAT/firewall,
 TLS/SRTP, codec and endpoint tests; monitoring/support/maintenance; controlled
-Asterisk/PJProject/Jansson update governance; reproducible remaining apt
-packages; enforced repository security controls; dependency alerts; container
-CVE scanning; and explicit carrier/legal/production acceptance.
+Asterisk/PJProject/Jansson and package-snapshot refresh governance; removal or
+renewed review of the time-limited Debian CVE exceptions; managed secret/code
+scanning (GitHub Advanced Security is unavailable here); and explicit
+carrier/legal/production acceptance.
 
 The isolated test-DID document is a future gate plan only. It must not run
 without named approvals, one explicit ordinary test destination on a positive

@@ -97,6 +97,12 @@ CycloneDX npm and pinned Asterisk-source SBOMs. The tracked-file secret scan
 includes the lockfile. Only redacted failure diagnostics and the SBOMs are
 uploaded, with three-day retention.
 
+GitHub's repository setting requires full action SHAs. Dependabot vulnerability
+alerts and automated fixes are enabled; `.github/dependabot.yml` schedules
+weekly npm, action, and Docker updates once this configuration reaches the
+default branch. Managed secret/code scanning is not available without Advanced
+Security and is not claimed by these controls.
+
 Every Compose build output has an explicit component/version tag and uses the
 current Compose project as its local image namespace. The policy check rejects
 implicit or explicit `latest` tags and prevents the isolated full-stack,
@@ -104,11 +110,21 @@ browser, and recovery projects from racing on one mutable local tag.
 
 Asterisk 22.10.1, bundled PJProject 2.17 and Jansson 2.15.0, English core
 prompts, and Opsound music-on-hold are fetched as exact releases and verified
-against checked-in SHA-256 values during the image build. The Ubuntu
-runtime/build packages and the Debian SIPp package still resolve from apt
-repositories at image-build time; a repository-wide enforced SHA policy,
-dependency alerts, and container CVE scanning are not configured. These are
-recorded residual supply-chain gates, not hidden by a successful build.
+against checked-in SHA-256 values during the image build. Direct Ubuntu
+packages use exact versions from snapshot `20260820T120000Z`; Debian build and
+SIPp packages use exact versions from archive/security imports
+`20260820T142943Z` and `20260820T142410Z`. Any apt update error is fatal. The
+minimal Jammy base first bootstraps exact CA/openssl versions from the signed
+live archive so it can reach Canonical's HTTPS-only snapshot service.
+
+`npm run scan:containers` downloads exact Trivy 0.74.0, verifies archive SHA-256
+`2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a`,
+refuses registry fallback, asserts package managers/dev dependencies are absent
+from Node runtime images, and scans all four local images. New or fixable
+HIGH/CRITICAL findings fail. The package-scoped Debian exception in
+`.github/container-cve-policy.json` expires on 2026-09-20; update the snapshots,
+rerun every runtime suite, and remove or explicitly re-review it before then.
+Snapshot pins are reproducible inputs, not an automatic patch stream.
 
 ## Deploy observation
 

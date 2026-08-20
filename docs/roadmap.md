@@ -21,6 +21,10 @@ proof of concept, not a production PBX or telephone service.
   state separated from configuration.
 - Disposable SIPp/Asterisk, Chromium, and A/B/C backup/recovery acceptance with
   synthetic identities, credentials, prompts, calls, WAV, and RTP only.
+- Digest/SHA-pinned actions, bases, source archives and SBOM inputs; exact apt
+  versions from named Ubuntu/Debian snapshots; minimized Node runtimes; and a
+  local-image CVE gate whose only exception is package-scoped and expires on
+  2026-09-20.
 - Fail-closed absence of external routing: `trunk`/`external` are disabled,
   `110`/`112` are reserved, and there is no automatic outside line.
 
@@ -43,10 +47,11 @@ approved engineering project:
   reconnect, and provider-failure acceptance;
 - privacy, voicemail retention, support, monitoring, incident response,
   backups, maintenance windows, and an operations owner;
-- TLS/SRTP policy, host/network hardening, image vulnerability governance,
-  dependency alerts, and enforced repository controls;
+- TLS/SRTP policy, host/network hardening, managed secret/code scanning, and
+  remediation or reviewed renewal of the time-limited Debian CVE exception;
 - controlled maintenance of the pinned Asterisk 22/PJProject source chain and
-  complete requalification for every runtime update; and
+  named package snapshots, with complete requalification for every runtime
+  update; and
 - production capacity, availability, RTO/RPO, penetration, carrier, and legal
   acceptance.
 

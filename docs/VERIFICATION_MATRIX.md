@@ -1,7 +1,7 @@
 # Verification matrix
 
 Snapshot: 2026-08-20 on branch `stabilize/calls-verified-poc`, verified tree
-`4a907716a702fad76bdc6970a8f44fcfcba4beb5` with Asterisk runtime-content
+`fd4c58df2e47ad59bb78b7da2e782a251ab13aed` with Asterisk runtime-content
 commit `4a5bad7afe6768163e8ba6e24a17afe1b5ce8e6d` (baseline
 `d88e8e54e7591bedd667e072737426c840c4160d`).
 “Passed” applies only to the named evidence class and never promotes a result
@@ -42,12 +42,12 @@ to a real-carrier, DID, telephone-network, or production claim.
   digest-pinned bases.
 - Full stack: 28 semantic checks passed, followed by Asterisk/backend restart
   and exact SQLite/active-deployment persistence checks; the complete successful
-  run took 110.40 seconds.
+  run took approximately 99 seconds.
 - Browser: Playwright 1.62.1 with Chrome for Testing 151.0.7922.34 ran all
-  eight tests in 33.2 seconds (61.24 seconds including the isolated stack
-  lifecycle): 8/8 passed, zero skips/TODOs, no unexpected
-  console/page errors, unallowlisted HTTP errors, failed requests, or unhandled
-  browser promise rejection.
+  eight tests in 32.2 seconds (approximately 57 seconds including the isolated
+  stack lifecycle): 8/8 passed, zero skips/TODOs, no unexpected console/page
+  errors, unallowlisted HTTP errors, failed requests, or unhandled browser
+  promise rejection.
 - Recovery: a fresh source ran 27 semantic checks; wrong key B failed closed;
   A restored into an empty target; A-to-C rotation materialised all three
   encrypted credentials; obsolete A failed against the C archive; C restored
@@ -55,16 +55,27 @@ to a real-carrier, DID, telephone-network, or production claim.
   active/last-good, audit, session invalidation, non-persisted AMI state,
   pre-start data/database modes, Asterisk startup, custom WAV/permissions, IVR
   playback, 56 observed RTP packets, semantic call routes, CDR, and WebSocket
-  assertions. The final complete A/B/C orchestration took 177.77 seconds;
-  unit fault injection additionally proved cleanup after target population
-  failure.
+  assertions. Unit fault injection additionally proved cleanup after target
+  population failure. The complete orchestration took approximately 192
+  seconds.
 - Supply-chain checks: immutable action/base/helper-image references, explicit
   versioned Compose build tags with a fail-closed no-`latest` policy,
   tracked-file high-confidence secret scan including the lockfile, 224-component
   npm and 6-component pinned Asterisk-source CycloneDX SBOM generation,
   worktree whitespace validation, and base-to-head PR whitespace validation
-  passed. Remaining Ubuntu/SIPp apt resolution and absence of a container-CVE
-  scanner remain recorded residual gates.
+  passed. Exact direct apt versions resolved from named Ubuntu/Debian snapshots;
+  Node runtime images had no package manager or checked development dependency.
+  Checksum-verified Trivy 0.74.0 found zero HIGH/CRITICAL issues in Asterisk and
+  frontend and no new or fixable finding in any image. Fifteen unique unfixed
+  Debian IDs remain explicitly package-scoped through 2026-09-20 (30 backend
+  and 33 SIPp-image occurrences); this is a visible PoC exception and production
+  blocker, not a clean vulnerability claim.
+- Repository controls: GitHub full-action-SHA enforcement, Dependabot
+  vulnerability alerts, and automated security fixes are enabled; the current
+  alert list is empty. Weekly npm/action/Docker updates are checked in but take
+  effect only from the default branch. Managed secret/code scanning is not
+  available without GitHub Advanced Security; only the narrower local secret
+  scan is evidenced.
 
 ## Evidence-class definitions
 

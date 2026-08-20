@@ -171,3 +171,42 @@ mutable distribution Asterisk package.
 LTS support removes only the old runtime-EOL blocker and does not establish
 carrier, DID, NAT/audio, emergency, legal, operational, or production
 acceptance. No further major upgrade is authorized.
+
+## Package inputs are snapshot-pinned and runtime images are minimized
+
+**Decision:** Keep every base image on an immutable digest, resolve Asterisk
+Ubuntu packages through snapshot `20260820T120000Z`, and resolve Debian archive
+and security packages through imports `20260820T142943Z` and
+`20260820T142410Z`. Pin every direct apt package version and make any apt update
+error fatal. Because the minimal Jammy base has no CA bundle, bootstrap only
+the exact CA/openssl versions from Ubuntu's signed live archive before switching
+to the snapshot. Remove npm, npx, Yarn, Corepack, and backend development
+dependencies from Node runtime images.
+
+**Reason:** Digest-pinned bases alone do not make later package installation
+reproducible, and build tooling in a runtime image creates avoidable attack
+surface. Exact versions plus immutable snapshots either reproduce the selected
+closure or fail closed.
+
+**Consequence:** Snapshots also freeze vulnerabilities and have finite external
+retention. Every snapshot refresh is a reviewed runtime change requiring image,
+SIPp, browser, and recovery requalification; a long-term pilot needs an owned
+signed mirror rather than indefinite reliance on public history.
+
+## Container CVEs use a narrow, expiring exception instead of silent ignores
+
+**Decision:** Download Trivy 0.74.0 from its exact release URL, verify its
+SHA-256 before execution, and scan only the four already-built local images.
+Any new or fixable HIGH/CRITICAL finding fails. The 15 currently unfixed Debian
+IDs are allowed only for the named backend/SIPp packages through
+2026-09-20; expiry, a newly published fix, or a stale exception also fails.
+
+**Reason:** A blanket `ignore-unfixed` would hide changes, while pretending the
+upstream Debian findings do not exist would turn a green gate into a production
+claim. A package-scoped deadline keeps the PoC testable and the residual risk
+reviewable.
+
+**Consequence:** This is a time-limited technical-PoC acceptance, not a security
+or production approval. GitHub enforces full action SHAs and Dependabot alerts
+and automated fixes are enabled, but managed secret/code scanning remains
+unavailable without Advanced Security and is still an external gate.
