@@ -1,9 +1,26 @@
 # Asterisk 22 is built from an exact upstream release because Ubuntu 22.04
 # only packages the end-of-life Asterisk 18 series. Every downloaded archive
 # is version- and checksum-pinned; the runtime image contains no compiler.
-ARG UBUNTU_IMAGE=ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc
+FROM ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc AS ubuntu-snapshot
 
-FROM ${UBUNTU_IMAGE} AS builder
+# Jammy's minimal base does not carry a CA bundle, while Canonical's immutable
+# snapshot service is HTTPS-only. Bootstrap only exact CA/openssl versions from
+# the signed live archive, then make every subsequent package lookup use one
+# immutable snapshot. A missing version or snapshot therefore fails closed.
+ARG UBUNTU_APT_SNAPSHOT=20260820T120000Z
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get -o APT::Update::Error-Mode=any update \
+    && apt-get install -y --no-install-recommends \
+      ca-certificates=20260601~22.04.1 \
+      openssl=3.0.2-0ubuntu1.26 \
+    && printf '%s\n' \
+      "deb [snapshot=${UBUNTU_APT_SNAPSHOT}] http://archive.ubuntu.com/ubuntu jammy main" \
+      "deb [snapshot=${UBUNTU_APT_SNAPSHOT}] http://archive.ubuntu.com/ubuntu jammy-updates main" \
+      "deb [snapshot=${UBUNTU_APT_SNAPSHOT}] http://security.ubuntu.com/ubuntu jammy-security main" \
+      > /etc/apt/sources.list \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM ubuntu-snapshot AS builder
 
 ARG ASTERISK_VERSION=22.10.1
 ARG ASTERISK_SHA256=0953564c44fa49827f3c9d70ca6e80db83828c9848440852c6be44c961855353
@@ -15,20 +32,19 @@ ARG JANSSON_SHA256=a7eac7765000373165f9373eb748be039c10b2efc00be9af3467ec92357d8
 ARG CORE_SOUNDS_VERSION=1.6.1
 ARG CORE_SOUNDS_SHA256=d79c3d2044d41da8f363c447dfccc140be86b4fcc41b1ca5a60a80da52f24f2d
 
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    autoconf \
-    build-essential \
-    bzip2 \
-    ca-certificates \
-    curl \
-    libedit-dev \
-    libsqlite3-dev \
-    libssl-dev \
-    libxml2-dev \
-    patch \
-    pkg-config \
-    uuid-dev \
+RUN apt-get -o APT::Update::Error-Mode=any update \
+    && apt-get install -y --no-install-recommends \
+    autoconf=2.71-2 \
+    build-essential=12.9ubuntu3 \
+    bzip2=1.0.8-5build1 \
+    curl=7.81.0-1ubuntu1.26 \
+    libedit-dev=3.1-20210910-1build1 \
+    libsqlite3-dev=3.37.2-2ubuntu0.7 \
+    libssl-dev=3.0.2-0ubuntu1.26 \
+    libxml2-dev=2.9.13+dfsg-1ubuntu0.12 \
+    patch=2.7.6-7build2 \
+    pkg-config=0.29.2-1ubuntu3 \
+    uuid-dev=2.37.2-4ubuntu3.5 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src
@@ -122,21 +138,21 @@ RUN curl --fail --location --retry 3 \
       /opt/asterisk-root/usr/share/doc/asterisk-moh-opsound-wav/ \
     && rm core-sounds.tar.gz moh.tar.gz
 
-FROM ${UBUNTU_IMAGE}
+FROM ubuntu-snapshot
 
 ARG ASTERISK_VERSION=22.10.1
 LABEL org.opencontainers.image.title="Essentials+ Calls synthetic Asterisk runtime" \
       org.opencontainers.image.version="${ASTERISK_VERSION}" \
       org.opencontainers.image.source="https://github.com/itmitalles-de/essentials-calls"
 
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libedit2 \
-    libsqlite3-0 \
-    libssl3 \
-    libtinfo6 \
-    libuuid1 \
-    libxml2 \
+RUN apt-get -o APT::Update::Error-Mode=any update \
+    && apt-get install -y --no-install-recommends \
+    libedit2=3.1-20210910-1build1 \
+    libsqlite3-0=3.37.2-2ubuntu0.7 \
+    libssl3=3.0.2-0ubuntu1.26 \
+    libtinfo6=6.3-2ubuntu0.2 \
+    libuuid1=2.37.2-4ubuntu3.5 \
+    libxml2=2.9.13+dfsg-1ubuntu0.12 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/asterisk-root/ /

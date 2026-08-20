@@ -29,9 +29,13 @@ const pjprojectCommit = dockerArg('PJPROJECT_COMMIT');
 const janssonVersion = dockerArg('JANSSON_VERSION');
 const coreSoundsVersion = dockerArg('CORE_SOUNDS_VERSION');
 const mohVersion = dockerArg('MOH_VERSION');
-const ubuntuImage = dockerArg('UBUNTU_IMAGE');
+const ubuntuImageMatch = dockerfile.match(
+  /^FROM (ubuntu:[^@\s]+@sha256:[0-9a-f]{64}) AS ubuntu-snapshot$/m,
+);
+if (!ubuntuImageMatch) throw new Error('Ubuntu snapshot stage must pin an exact sha256 digest.');
+const ubuntuImage = ubuntuImageMatch[1];
 const ubuntu = ubuntuImage.match(/^ubuntu:([^@]+)@sha256:([0-9a-f]{64})$/);
-if (!ubuntu) throw new Error('UBUNTU_IMAGE must pin an exact sha256 digest.');
+if (!ubuntu) throw new Error('Ubuntu base image must pin an exact sha256 digest.');
 
 const rootRef = `pkg:oci/essentials-calls-asterisk@${asteriskVersion}`;
 const components = [
@@ -42,7 +46,10 @@ const components = [
     checksum: ubuntu[2],
     purl: `pkg:oci/ubuntu@${ubuntu[1]}`,
     url: `https://hub.docker.com/_/ubuntu`,
-    properties: [{ name: 'essentials-calls:oci-reference', value: ubuntuImage }],
+    properties: [
+      { name: 'essentials-calls:oci-reference', value: ubuntuImage },
+      { name: 'essentials-calls:apt-snapshot', value: dockerArg('UBUNTU_APT_SNAPSHOT') },
+    ],
   }),
   sha256Component({
     type: 'application',
