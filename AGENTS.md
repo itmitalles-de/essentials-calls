@@ -73,6 +73,21 @@ When visible context usage reaches roughly 50-70%, prefer reaching a coherent
 stopping point, validating, updating the handoff, and continuing in a fresh
 session. Do not interrupt an atomic change merely to satisfy that range.
 
+## Simple Business UI contract
+
+For every product-owned web or desktop UI change, first read the canonical,
+version-pinned Simple Business contract named in
+`.simple-business-design-system.json`. In the standard sibling checkout, the
+authoritative files are under `../simple-business-design-system/docs/design-system/`.
+Do not duplicate or reinterpret those rules in this repository.
+
+The central contract governs the shared shell, color/tokens, flat construction,
+sidebar/drawer behavior, settings anatomy, theme control, icon semantics, and
+five-direction comparison. Existing UI is legacy until migrated; do not add new
+violations. Package/lint activation remains gated by the central consumer
+manifest and must use an exact released version, never a floating branch, CDN,
+or runtime download.
+
 ## Validation
 
 - Tests: `npm test`

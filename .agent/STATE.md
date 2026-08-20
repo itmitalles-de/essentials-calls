@@ -83,3 +83,10 @@ This continuation is committed locally on `master` but intentionally not pushed
 because the user requested a pause. Existing GitHub draft PR #2 is unrelated
 and must not be merged or repurposed. The exact unfinished technical work is
 recorded in `.agent/TODO.md`.
+
+## Simple Business design-system contract
+
+- `.simple-business-design-system.json` pins the central UI source to commit
+  `e508cc2` and package version `0.1.0`; no rules are copied into this product.
+- Existing UI remains legacy. Package/CI activation waits for the central
+  GitHub Actions billing blocker to be resolved and is not claimed as complete.
