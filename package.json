@@ -24,6 +24,7 @@
     "test:full-stack": "sh scripts/full-stack-acceptance.sh",
     "test:e2e": "sh scripts/browser-e2e.sh",
     "test:backup-restore": "sh scripts/backup-restore-acceptance.sh",
+    "validate:compose-images": "sh scripts/validate-compose-images.sh",
     "scan:secrets": "sh scripts/secret-scan.sh",
     "sbom": "npm sbom --sbom-format=cyclonedx",
     "sbom:asterisk": "node scripts/asterisk-sbom.mjs",

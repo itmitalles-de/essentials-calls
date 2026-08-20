@@ -1,5 +1,6 @@
 services:
   backend:
+    image: "${COMPOSE_PROJECT_NAME:-visual-pbx}-backend:0.1.0-node24.19.0"
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -43,6 +44,7 @@ services:
       - asterisk
 
   frontend:
+    image: "${COMPOSE_PROJECT_NAME:-visual-pbx}-frontend:0.1.0-node24.19.0"
     build:
       context: .
       dockerfile: frontend/Dockerfile
@@ -59,6 +61,7 @@ services:
       - backend
 
   asterisk:
+    image: "${COMPOSE_PROJECT_NAME:-visual-pbx}-asterisk:22.10.1"
     build:
       context: ./asterisk
     restart: unless-stopped

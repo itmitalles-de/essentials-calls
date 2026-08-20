@@ -56,6 +56,7 @@ npm test
 npm run build
 docker compose config --quiet
 docker compose -f docker-compose.yml -f docker-compose.acceptance.yml --profile acceptance config --quiet
+npm run validate:compose-images
 docker compose -f docker-compose.yml -f docker-compose.acceptance.yml --profile acceptance build
 npm run test:full-stack
 npm run test:e2e
@@ -95,6 +96,11 @@ static job checks the real PR base/head range for whitespace and creates
 CycloneDX npm and pinned Asterisk-source SBOMs. The tracked-file secret scan
 includes the lockfile. Only redacted failure diagnostics and the SBOMs are
 uploaded, with three-day retention.
+
+Every Compose build output has an explicit component/version tag and uses the
+current Compose project as its local image namespace. The policy check rejects
+implicit or explicit `latest` tags and prevents the isolated full-stack,
+browser, and recovery projects from racing on one mutable local tag.
 
 Asterisk 22.10.1, bundled PJProject 2.17 and Jansson 2.15.0, English core
 prompts, and Opsound music-on-hold are fetched as exact releases and verified

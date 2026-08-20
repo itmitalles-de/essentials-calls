@@ -17,11 +17,12 @@ until a separately designed, backward-compatible migration exists:
 | SQLite file | `essentials-calls.sqlite3` | Backup/restore and installed data compatibility |
 | Compose data volume | `pbx-data` | Do not orphan existing local data |
 | Generated/sound volumes | `asterisk-generated`, `asterisk-sounds` | Runtime and recovery compatibility |
+| Default Compose project/image prefix | `visual-pbx` | Preserve ordinary local stack identity; build tags are explicit and versioned |
 | Asterisk paths and generated names | Existing values | Deployed configuration and rollback compatibility |
 | Default branch | `master` | Repository automation and history |
 
 Acceptance scripts use isolated `essentials-calls-*` Compose project names.
-They must never reuse ordinary application volumes.
+They must never reuse ordinary application volumes or mutable image tags.
 
 These names are implementation details, not an alternate repository or product
 name. Public clone links, documentation, UI copy, issue references, badges, and
