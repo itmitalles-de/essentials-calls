@@ -32,7 +32,7 @@ collect_failure() {
   docker run --rm \
     -v "${COMPOSE_PROJECT_NAME}_acceptance-artifacts:/source:ro" \
     -v "$diagnostic_dir:/target" \
-    alpine:3.22 sh -c 'cp -a /source/. /target/ 2>/dev/null || true'
+    alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce sh -c 'cp -a /source/. /target/ 2>/dev/null || true'
   printf 'Failure diagnostics (redacted): %s\n' "$diagnostic_dir" >&2
 }
 

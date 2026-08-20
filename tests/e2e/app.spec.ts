@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { APIRequestContext, Page, expect, request, test } from '@playwright/test';
+import { APIRequestContext, Page, Response, expect, request, test } from '@playwright/test';
 
 const repositoryRoot = path.resolve(process.cwd());
 const browserBase = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18180';
@@ -20,16 +20,35 @@ interface ApiSession {
 
 const browserFailures = new WeakMap<Page, string[]>();
 
+function expectedNegativeResponse(response: Response): boolean {
+  const { pathname } = new URL(response.url());
+  const method = response.request().method();
+  const status = response.status();
+  return (
+    (method === 'GET' && pathname === '/api/auth/session' && status === 401) ||
+    (method === 'DELETE' && pathname === '/api/sounds/e2e-prompt' && status === 409) ||
+    (method === 'PUT' && pathname === '/api/topology' && status === 409)
+  );
+}
+
 function monitorBrowserFailures(page: Page): string[] {
   const failures: string[] = [];
   browserFailures.set(page, failures);
   page.on('console', (entry) => {
-    // Chromium reports deliberately asserted 4xx/5xx API responses as generic
-    // resource errors. Keep JavaScript console errors strict while the tests
-    // assert the expected negative HTTP paths semantically through the UI.
+    // Chromium duplicates HTTP failures as generic console messages. Response
+    // and request-failure listeners below validate those with an exact
+    // method/path/status allowlist; every other console error remains fatal.
     if (entry.type() === 'error' && !entry.text().startsWith('Failed to load resource:')) {
       failures.push(`console.error: ${entry.text()}`);
     }
+  });
+  page.on('response', (response) => {
+    if (response.status() >= 400 && !expectedNegativeResponse(response)) {
+      failures.push(`http ${response.status()}: ${response.request().method()} ${response.url()}`);
+    }
+  });
+  page.on('requestfailed', (request) => {
+    failures.push(`requestfailed: ${request.method()} ${request.url()} (${request.failure()?.errorText ?? 'unknown error'})`);
   });
   page.on('pageerror', (error) => failures.push(`pageerror: ${error.message}`));
   return failures;

@@ -11,7 +11,7 @@ fi
 
 patterns='-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----|github_pat_[A-Za-z0-9_]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}'
 
-if git grep -nEI -e "$patterns" -- . ':!package-lock.json'; then
+if git grep -nEI -e "$patterns" -- .; then
   printf 'Potential high-confidence secret material was found in tracked files.\n' >&2
   exit 1
 fi

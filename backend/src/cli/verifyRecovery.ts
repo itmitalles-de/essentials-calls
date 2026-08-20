@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import fs from 'node:fs';
+import path from 'node:path';
 import { getDatabase } from '../model/store';
 import { loadSecretCipher } from '../security/crypto';
 
@@ -13,6 +14,10 @@ function containsRuntimeState(value: unknown): boolean {
 
 try {
   const expectRotation = process.argv.includes('--expect-rotation');
+  const dataDir = process.env.DATA_DIR ?? path.join(__dirname, '..', '..', 'data');
+  const databasePath = path.join(dataDir, 'essentials-calls.sqlite3');
+  assert.equal(fs.statSync(dataDir).mode & 0o777, 0o700, 'restore must set the data directory mode to 0700 before startup');
+  assert.equal(fs.statSync(databasePath).mode & 0o777, 0o600, 'restore must set the database mode to 0600 before startup');
   const database = getDatabase();
   const cipher = loadSecretCipher();
   const current = database.currentTopology();
@@ -59,8 +64,8 @@ try {
 
   assert.equal(containsRuntimeState(current.topology), false, 'ephemeral AMI/runtime state leaked into topology persistence');
   assert.equal(tableNames.some((name) => /^(ami|runtime|node_status)/i.test(name)), false, 'ephemeral AMI/runtime table was persisted');
-  assert.equal(fs.statSync(database.dataDir).mode & 0o777, 0o700, 'restored data directory mode must be 0700');
-  assert.equal(fs.statSync(database.databasePath).mode & 0o777, 0o600, 'restored database mode must be 0600');
+  assert.equal(fs.statSync(database.dataDir).mode & 0o777, 0o700, 'restored data directory mode must remain 0700');
+  assert.equal(fs.statSync(database.databasePath).mode & 0o777, 0o600, 'restored database mode must remain 0600');
 
   console.log(
     `Recovery state verified: ${users.length} users, ${revisions.length} revisions, ${secretRows.length} encrypted credentials, key ID ${cipher.id}.`

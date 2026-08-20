@@ -71,14 +71,25 @@ describe('backup and empty restore', () => {
     const targetData = path.join(target, 'data');
     const targetSounds = path.join(target, 'sounds');
     const targetGenerated = path.join(target, 'generated');
+    const readerGid = process.getgid?.();
     await restoreBackup({
       archivePath: archive,
       dataDir: targetData,
       soundsDir: targetSounds,
       configDir: targetGenerated,
       cipher: key,
-      soundsReaderGid: process.getgid?.(),
+      soundsReaderGid: readerGid,
     });
+    // These modes must be established by restore itself, before constructing a
+    // PbxDatabase can normalize them as a startup side effect.
+    assert.equal(fs.statSync(targetData).mode & 0o777, 0o700);
+    assert.equal(fs.statSync(path.join(targetData, 'essentials-calls.sqlite3')).mode & 0o777, 0o600);
+    assert.equal(fs.statSync(targetSounds).mode & 0o777, 0o750);
+    assert.equal(fs.statSync(path.join(targetSounds, 'synthetic.wav')).mode & 0o777, 0o640);
+    if (readerGid !== undefined) {
+      assert.equal(fs.statSync(targetSounds).gid, readerGid);
+      assert.equal(fs.statSync(path.join(targetSounds, 'synthetic.wav')).gid, readerGid);
+    }
     const restored = new PbxDatabase(targetData, key);
     assert.equal(restored.currentTopology().topology.name, 'Backed up revision');
     assert.equal(restored.currentTopology().activeRevision, saved.revision);
@@ -90,8 +101,6 @@ describe('backup and empty restore', () => {
     assert.deepEqual(new Set(restored.listUsers().map((user) => user.role)), new Set(['admin', 'editor', 'viewer']));
     assert.equal((restored.db.prepare('SELECT COUNT(*) AS count FROM sessions').get() as { count: number }).count, 0);
     assert.equal(fs.readFileSync(path.join(targetSounds, 'synthetic.wav')).subarray(0, 4).toString('ascii'), 'RIFF');
-    assert.equal(fs.statSync(targetSounds).mode & 0o777, 0o750);
-    assert.equal(fs.statSync(path.join(targetSounds, 'synthetic.wav')).mode & 0o777, 0o640);
     assert.equal(fs.readlinkSync(path.join(targetGenerated, 'current')), 'versions/good');
     const tableNames = (restored.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>).map((row) => row.name);
     assert.equal(tableNames.some((name) => /^(ami|runtime|node_status)/i.test(name)), false);
@@ -132,6 +141,51 @@ describe('backup and empty restore', () => {
       /muss.*leer/
     );
     assert.equal(fs.readFileSync(path.join(nonEmpty, 'data', 'existing'), 'utf8'), 'keep');
+  });
+
+  test('validates permissions before target writes and rolls back a failed population', async () => {
+    const source = root();
+    const database = new PbxDatabase(path.join(source, 'data'), key);
+    const sounds = path.join(source, 'sounds');
+    fs.mkdirSync(sounds);
+    fs.writeFileSync(path.join(sounds, 'synthetic.wav'), syntheticWav());
+    const archive = path.join(source, 'backup.tar.gz');
+    await createBackup({ database, soundsDir: sounds, configDir: path.join(source, 'generated'), outputPath: archive });
+    database.close();
+
+    const invalidPermissions = root();
+    await assert.rejects(
+      restoreBackup({
+        archivePath: archive,
+        dataDir: path.join(invalidPermissions, 'data'),
+        soundsDir: path.join(invalidPermissions, 'sounds'),
+        configDir: path.join(invalidPermissions, 'generated'),
+        cipher: key,
+        soundsReaderGid: -1,
+      }),
+      /SOUNDS_READER_GID/
+    );
+    assert.deepEqual(fs.readdirSync(invalidPermissions), []);
+
+    const failedPopulation = root();
+    const targetData = path.join(failedPopulation, 'data');
+    fs.mkdirSync(targetData, { mode: 0o711 });
+    fs.chmodSync(targetData, 0o711);
+    const blockedParent = path.join(failedPopulation, 'not-a-directory');
+    fs.writeFileSync(blockedParent, 'keep');
+    await assert.rejects(
+      restoreBackup({
+        archivePath: archive,
+        dataDir: targetData,
+        soundsDir: path.join(blockedParent, 'sounds'),
+        configDir: path.join(failedPopulation, 'generated'),
+        cipher: key,
+      })
+    );
+    assert.deepEqual(fs.readdirSync(targetData), []);
+    assert.equal(fs.statSync(targetData).mode & 0o777, 0o711);
+    assert.equal(fs.readFileSync(blockedParent, 'utf8'), 'keep');
+    assert.equal(fs.existsSync(path.join(failedPopulation, 'generated')), false);
   });
 
   test('detects archive corruption before touching targets', async () => {
