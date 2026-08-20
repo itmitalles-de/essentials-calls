@@ -7,7 +7,8 @@
   CI as production approval.
 - [ ] Choose and fund the remaining supply-chain controls: repository-enforced
   SHA policy, dependency/secret/code alerts, container CVE scanning, and a
-  reproducible package source for the Asterisk/SIPp apt dependencies.
+  reproducible package source for the remaining Ubuntu runtime/build and SIPp
+  apt dependencies.
 - [ ] Keep the isolated test-DID pilot blocked until every external gate in
   `docs/PILOT_TEST_DID.md` has a named owner, evidence, one positively
   allowlisted ordinary test number, and an approved maintenance window.
@@ -20,10 +21,10 @@
 - Privacy, emergency, support, monitoring, backup, and incident ownership.
 - Real handset/softphone, caller-ID, codec, NAT/firewall, and two-way audio
   acceptance.
-- Upstream-supported Asterisk strategy and complete requalification.
+- Controlled Asterisk/PJProject/Jansson update ownership and requalification.
 - Real carrier, DID, telephone-network, legal, and explicit production
   acceptance.
 
 No real trunk/DID, emergency route, recording, transcription, AI, public
-exposure, customer operation, or Asterisk major upgrade is selected. Deferred
-ideas remain documentation-only in `docs/NICE_TO_HAVE.md`.
+exposure, customer operation, or further Asterisk major upgrade beyond 22 is
+selected. Deferred ideas remain documentation-only in `docs/NICE_TO_HAVE.md`.

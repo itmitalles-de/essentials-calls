@@ -1,12 +1,12 @@
 # Verification matrix
 
-Snapshot: 2026-08-20 on branch `stabilize/calls-verified-poc`, reviewed
-runtime-content commit `8f0cdd9311b0ef9511615e23866be143e684c71c` (baseline
+Snapshot: 2026-08-20 on branch `stabilize/calls-verified-poc`, verified
+runtime-content commit `4a5bad7afe6768163e8ba6e24a17afe1b5ce8e6d` (baseline
 `d88e8e54e7591bedd667e072737426c840c4160d`).
 “Passed” applies only to the named evidence class and never promotes a result
 to a real-carrier, DID, telephone-network, or production claim.
 
-| Capability | Unit | Integration | SIPp | Asterisk 18 | Browser | Backup/restore | Real carrier | Real DID | Real telephone network | Production |
+| Capability | Unit | Integration | SIPp | Asterisk 22 | Browser | Backup/restore | Real carrier | Real DID | Real telephone network | Production |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Authentication, CSRF, roles, rate limit | Passed | API passed | N/A | Indirect | Passed | Three roles restored; sessions invalidated | Not run | N/A | Not run | None |
 | Topology, revisions, conflict, rollback | Passed | API/database/deploy passed | Route topology used | Active/last-good passed | Passed | Revisions and pointers restored | Not run | Not run | Not run | None |
@@ -38,9 +38,10 @@ to a real-carrier, DID, telephone-network, or production claim.
   variables; Asterisk, backend, frontend, and SIPp acceptance images built from
   digest-pinned bases.
 - Full stack: 28 semantic checks passed, followed by Asterisk/backend restart
-  and exact SQLite/active-deployment persistence checks.
+  and exact SQLite/active-deployment persistence checks; the complete successful
+  run took about 150 seconds.
 - Browser: Playwright 1.62.1 with Chrome for Testing 151.0.7922.34 ran all
-  eight tests in 32.4 seconds: 8/8 passed, zero skips/TODOs, no unexpected
+  eight tests in 33.5 seconds: 8/8 passed, zero skips/TODOs, no unexpected
   console/page errors, unallowlisted HTTP errors, failed requests, or unhandled
   browser promise rejection.
 - Recovery: a fresh source ran 27 semantic checks; wrong key B failed closed;
@@ -50,14 +51,15 @@ to a real-carrier, DID, telephone-network, or production claim.
   active/last-good, audit, session invalidation, non-persisted AMI state,
   pre-start data/database modes, Asterisk startup, custom WAV/permissions, IVR
   playback, 56 observed RTP packets, semantic call routes, CDR, and WebSocket
-  assertions. The final complete A/B/C orchestration took about 162 seconds;
+  assertions. The final complete A/B/C orchestration took about 155 seconds;
   unit fault injection additionally proved cleanup after target population
   failure.
 - Supply-chain checks: immutable action/base/helper-image references,
-  tracked-file high-confidence secret scan including the lockfile, npm
-  CycloneDX SBOM generation, worktree whitespace validation, and base-to-head
-  PR whitespace validation passed. Asterisk/SIPp apt resolution and absence of
-  a container-CVE scanner remain recorded residual gates.
+  tracked-file high-confidence secret scan including the lockfile, 224-component
+  npm and 6-component pinned Asterisk-source CycloneDX SBOM generation,
+  worktree whitespace validation, and base-to-head PR whitespace validation
+  passed. Remaining Ubuntu/SIPp apt resolution and absence of a container-CVE
+  scanner remain recorded residual gates.
 
 ## Evidence-class definitions
 
@@ -65,9 +67,9 @@ to a real-carrier, DID, telephone-network, or production claim.
 - **Integration:** API, SQLite, generator, deploy protocol, archive, and event
   behavior without claiming an external telephone network.
 - **SIPp:** synthetic SIP registration/calls and RTP in disposable networks.
-- **Asterisk 18:** the pinned Ubuntu Asterisk 18.10 container loads and executes
-  generated configuration. Upstream support has ended; this is not a production
-  support claim.
+- **Asterisk 22:** the checksum-pinned Asterisk 22.10.1 source runtime with
+  bundled PJProject 2.17 and Jansson 2.15.0 loads and executes generated
+  configuration. LTS status is not a production-acceptance claim.
 - **Browser:** semantic Chromium interaction with real local Compose services;
   screenshots are diagnostics, not pass evidence.
 - **Backup/restore:** application-level recovery into fresh local volumes with
