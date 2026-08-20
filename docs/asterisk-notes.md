@@ -1,4 +1,4 @@
-# Asterisk 18 runtime notes
+# Asterisk 22 LTS runtime notes
 
 These constraints were exercised in the disposable Asterisk container. A
 configuration loading without an error is not sufficient evidence; the
@@ -19,15 +19,17 @@ media for runtime evidence; it does not prove real NAT traversal.
 
 ## No plaintext password in generated PJSIP
 
-The pinned Asterisk 18 supports legacy `auth_type=md5` and `md5_cred`, but
-not the newer `password_digest` introduced in later supported branches. The
-realm must exactly match the realm used for HA1 calculation. The implementation
-fixes both to `asterisk` and the SIPp acceptance confirms REGISTER and INVITE
-authentication still work.
+The pinned Asterisk 22 runtime uses `auth_type=digest` and a pre-computed
+`password_digest`, so the deprecated `auth_type=md5`/`md5_cred` fields are not
+generated. The realm must exactly match the realm used for HA1 calculation.
 
-This MD5 usage is dictated by Asterisk 18 digest compatibility; it does not
-justify MD5 for application password hashing. Application users use scrypt,
-and source SIP passwords remain AES-256-GCM encrypted.
+The current synthetic SIPp 3.6.1 client supports MD5 digest only, so the local
+test contract explicitly emits `password_digest=MD5:<HA1>` and
+`supported_algorithms_uas=MD5`. This is a test-client compatibility limit, not
+an Asterisk 22 limitation: the bundled PJProject 2.17 runtime also supports
+SHA-256 and SHA-512-256. Application users use scrypt, source SIP passwords
+remain AES-256-GCM encrypted, and the full-stack suite confirms REGISTER and
+INVITE authentication without plaintext generated credentials.
 
 ## IVR control flow
 
@@ -38,10 +40,10 @@ and permit an endless invalid-input loop.
 
 ## Voicemail modules
 
-The Ubuntu package ships mutually exclusive ODBC, IMAP, and file-backed
-voicemail modules. The image explicitly disables ODBC/IMAP so
-`app_voicemail.so` handles stored messages. Listing mailboxes alone did not
-prove message storage; the synthetic flow exercises the application.
+The source image builds the file-backed voicemail module and explicitly keeps
+ODBC/IMAP alternatives disabled, so `app_voicemail.so` handles stored messages.
+Listing mailboxes alone does not prove message storage; the synthetic flow
+exercises the application.
 
 ## Queue details
 
@@ -52,11 +54,12 @@ tested while its runtime exists, not inferred from a successful file parse.
 
 ## Sounds
 
-On Ubuntu, the custom sound lookup resolves through
-`/usr/share/asterisk/sounds/custom` to the shared local sounds directory.
-Asterisk-compatible uploads are PCM, mono, 16-bit, and 8 or 16 kHz. The backend
-validates this before an atomic file replacement, and deploy validation checks
-that every IVR reference exists.
+The source image preserves the compatibility lookup
+`/usr/share/asterisk/sounds/custom` to the shared local sounds directory. It
+installs checksum-pinned English GSM core prompts and Opsound WAV music-on-hold
+assets. Asterisk-compatible uploads are PCM, mono, 16-bit, and 8 or 16 kHz. The
+backend validates this before an atomic file replacement, and deploy validation
+checks that every IVR reference exists.
 
 ## Isolated preflight
 

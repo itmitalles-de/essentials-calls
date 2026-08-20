@@ -2,8 +2,9 @@
 
 This documentation describes the isolated technical proof of concept as of
 2026-08-20. The canonical repository is
-`itmitalles-de/essentials-calls`. Asterisk stays on the required 18.x base;
-historical npm/data identifiers remain only for compatibility.
+`itmitalles-de/essentials-calls`. The synthetic runtime uses checksum-pinned
+Asterisk 22.10.1 LTS; historical npm/data identifiers remain only for
+compatibility.
 
 Start with:
 

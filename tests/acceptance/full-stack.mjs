@@ -256,9 +256,12 @@ async function deploy() {
     path.join(process.env.ACCEPTANCE_CONFIG_DIR ?? '/shared-config-control', 'current', 'pjsip_generated.conf'),
     'utf8'
   );
-  invariant(/auth_type=md5[\s\S]*md5_cred=[0-9a-f]{32}/.test(generatedPjsip), 'Asterisk 18 HA1 auth was not generated.');
+  invariant(
+    /auth_type=digest[\s\S]*password_digest=MD5:[0-9a-f]{32}[\s\S]*supported_algorithms_uas=MD5/.test(generatedPjsip),
+    'Asterisk 22 digest HA1 auth was not generated.'
+  );
   invariant(!/synthetic-(?:101|102|103)-pass-2026/.test(generatedPjsip), 'Generated PJSIP config contains a plaintext SIP secret.');
-  record('generated PJSIP stores Asterisk 18 HA1 credentials without plaintext');
+  record('generated PJSIP stores Asterisk 22 digest HA1 credentials without plaintext');
   activeRevision = attempt.body.revision;
   record('Asterisk staging preflight, atomic activate, reload and runtime canary', attempt.body.deploymentId);
   return attempt.body;
@@ -830,7 +833,7 @@ async function main() {
     try {
       await ami.connect();
       const version = await ami.command('core show version');
-      invariant(/Asterisk 18\./.test(version), `Unexpected restored Asterisk major: ${version}`);
+      invariant(/Asterisk 22\./.test(version), `Unexpected restored Asterisk major: ${version}`);
       await customIvrMedia(ami);
       await directCallAndReregistration(ami);
       await syntheticCallflows(ami);
@@ -850,8 +853,8 @@ async function main() {
   try {
     await ami.connect();
     const version = await ami.command('core show version');
-    invariant(/Asterisk 18\./.test(version), `Unexpected Asterisk major: ${version}`);
-    record('Asterisk 18 runtime without configuration rejection');
+    invariant(/Asterisk 22\./.test(version), `Unexpected Asterisk major: ${version}`);
+    record('Asterisk 22 runtime without configuration rejection');
     await customIvrMedia(ami);
     await directCallAndReregistration(ami);
     await syntheticCallflows(ami);

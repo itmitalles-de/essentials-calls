@@ -1,7 +1,7 @@
 # Essentials+ Calls
 
 Essentials+ Calls is a visual callflow editor, simulator, and isolated
-synthetic Asterisk 18 runtime. Its canonical repository is
+synthetic Asterisk 22 LTS runtime. Its canonical repository is
 `itmitalles-de/essentials-calls`.
 
 The stack is an extensively synthetically tested technical proof of concept,
@@ -31,8 +31,8 @@ the repository or product name.
 - Local sessions with scrypt password hashes, CSRF protection, login rate
   limiting, secure cookie policy, and `viewer`/`editor`/`admin` roles.
 - AES-256-GCM storage for SIP passwords. API responses and revisions expose
-  only `{ "configured": true|false }`; generated Asterisk 18 auth uses a
-  pre-computed MD5 HA1 value instead of plaintext.
+  only `{ "configured": true|false }`; generated Asterisk 22 digest auth uses
+  a pre-computed HA1 value instead of plaintext.
 - Server-authoritative sound inventory validation, protected deletion, and
   deliberate reference replacement.
 - Staged Asterisk generation, isolated container preflight, atomic activation,
@@ -76,6 +76,7 @@ npm run test:e2e
 npm run test:backup-restore
 npm run scan:secrets
 npm run --silent sbom > essentials-calls-npm.cdx.json
+npm run --silent sbom:asterisk > essentials-calls-asterisk.cdx.json
 git diff --check
 ```
 
@@ -92,7 +93,7 @@ production acceptance.
 | `shared/` | Versioned domain model, schedule evaluation, import migration, redaction, validation |
 | `backend/` | Auth/RBAC, SQLite, revisions/audit, API, backup, Asterisk generation/deploy, AMI events |
 | `frontend/` | React/React Flow editor, role-aware UI, import/export, sounds, revisions |
-| `asterisk/` | Pinned Asterisk 18 image, static config, isolated preflight worker |
+| `asterisk/` | Checksum-pinned Asterisk 22.10.1 source image, static config, isolated preflight worker |
 | `tests/acceptance/` | SIPp/AMI/CDR full-stack acceptance |
 | `tests/e2e/` | Playwright semantic browser acceptance |
 | `scripts/` | Reproducible acceptance and backup/restore orchestration |
@@ -104,7 +105,7 @@ production acceptance.
 | [Architecture](docs/architecture.md) | Components, persistence, event and deploy flows |
 | [Domain model](docs/domain-model.md) | Nodes, revisions, import format, and validation |
 | [Asterisk mapping](docs/asterisk-mapping.md) | Generated config and atomic activation |
-| [Asterisk notes](docs/asterisk-notes.md) | Runtime-tested Asterisk 18 constraints |
+| [Asterisk notes](docs/asterisk-notes.md) | Runtime-tested Asterisk 22 constraints |
 | [API](docs/api.md) | REST, roles, ETags, CSRF, and WebSocket |
 | [Security](docs/security.md) | Threat boundary, sessions, secrets, headers, and key rotation |
 | [Operations](docs/operations.md) | Configuration, bootstrap, tests, diagnostics, and recovery |

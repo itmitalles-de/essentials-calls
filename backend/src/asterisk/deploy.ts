@@ -209,7 +209,7 @@ export async function validateStagedWithAsterisk(staged: StagedConfig): Promise<
   fs.renameSync(requestTemp, request);
 
   try {
-    const deadline = Date.now() + Number(process.env.ASTERISK_PREFLIGHT_TIMEOUT_MS ?? 30_000);
+    const deadline = Date.now() + Number(process.env.ASTERISK_PREFLIGHT_TIMEOUT_MS ?? 65_000);
     while (Date.now() < deadline) {
       if (fs.existsSync(result)) {
         const response = fs.readFileSync(result, 'utf8').trim();

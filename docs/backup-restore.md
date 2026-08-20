@@ -16,7 +16,8 @@ and includes:
   SHA-256 checksums.
 
 The archive explicitly records `masterKeyIncluded: false`. Generated PJSIP
-files contain only Asterisk 18 HA1 derivatives, not plaintext SIP passwords.
+files contain only Asterisk 22 digest HA1 derivatives, not plaintext SIP
+passwords.
 
 ## Master key
 

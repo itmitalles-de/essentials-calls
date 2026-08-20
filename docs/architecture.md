@@ -4,8 +4,8 @@
 
 The product is **Essentials+ Calls** and the canonical repository is
 `itmitalles-de/essentials-calls`. The historical npm namespace, persistent
-identifiers, `master` branch, and required Asterisk 18 base remain separate
-compatibility boundaries documented in
+identifiers and `master` branch remain separate compatibility boundaries
+documented in
 [COMPATIBILITY_IDENTIFIERS.md](COMPATIBILITY_IDENTIFIERS.md). There is no
 shared Essentials+ Office database or copied Office component.
 
@@ -20,7 +20,7 @@ nginx + React :8080  ---->  Express :4000  ----> SQLite WAL (/data)
                 shared volumes <--+  +--> long-lived AMI :5038
                      |                       |
                      v                       v
-           generated config/sounds <---- Asterisk 18 :5060/RTP
+           generated config/sounds <---- Asterisk 22 :5060/RTP
                                                ^
                                                |
                                       SIPp synthetic clients
@@ -40,7 +40,7 @@ needed on a public host interface.
 | `backend/src/asterisk/` | config generator, staged deploy, AMI client/event status, WAV storage |
 | `backend/src/backup/` and `cli/` | checksummed backup, empty restore, bootstrap, key rotation |
 | `frontend/` | graph/table editor, bounded history, import/export, sounds, revisions, role-aware controls |
-| `asterisk/` | pinned Asterisk 18 base config and isolated preflight worker |
+| `asterisk/` | checksum-pinned Asterisk 22 source runtime and isolated preflight worker |
 | `tests/` and `scripts/` | disposable SIPp/AMI/CDR, Playwright, and restore acceptance |
 
 The shared validator gives immediate client feedback, but the backend always
@@ -64,7 +64,7 @@ must be handled as sensitive, and is excluded from normal exports and backups.
 All active credential rows are encrypted.
 
 Custom sounds and generated Asterisk versions remain separate named volumes.
-Generated files are derivatives. PJSIP files contain an Asterisk 18 HA1
+Generated files are derivatives. PJSIP files contain an Asterisk 22 digest HA1
 credential, not the source password.
 
 ## Revision and editing flow
@@ -91,7 +91,7 @@ the persisted current revision as a fresh history root.
 3. Materialize SIP secrets transiently.
 4. Generate all files in a private staging directory.
 5. Reject unsafe generated text and excessive output.
-6. Ask an isolated Asterisk 18 process in the container to load the candidate.
+6. Ask an isolated Asterisk 22 process in the container to load the candidate.
 7. Rename staging to an immutable version directory.
 8. atomically switch the `current` symlink.
 9. run targeted dialplan/PJSIP/queue/voicemail reloads through AMI.

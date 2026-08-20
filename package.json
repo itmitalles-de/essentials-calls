@@ -26,6 +26,7 @@
     "test:backup-restore": "sh scripts/backup-restore-acceptance.sh",
     "scan:secrets": "sh scripts/secret-scan.sh",
     "sbom": "npm sbom --sbom-format=cyclonedx",
+    "sbom:asterisk": "node scripts/asterisk-sbom.mjs",
     "dev:backend": "npm run dev -w backend",
     "dev:frontend": "npm run dev -w frontend"
   },

@@ -57,16 +57,19 @@ jobs:
             git show --check --format= "$GITHUB_SHA"
           fi
 
-      - name: Generate npm CycloneDX SBOM
+      - name: Generate pilot-build CycloneDX SBOMs
         run: |
           npm run --silent sbom > essentials-calls-npm.cdx.json
-          node -e "const fs=require('node:fs'); const bom=JSON.parse(fs.readFileSync('essentials-calls-npm.cdx.json','utf8')); if (bom.bomFormat !== 'CycloneDX' || !Array.isArray(bom.components) || bom.components.length === 0) process.exit(1);"
+          npm run --silent sbom:asterisk > essentials-calls-asterisk.cdx.json
+          node -e "const fs=require('node:fs'); for (const file of ['essentials-calls-npm.cdx.json','essentials-calls-asterisk.cdx.json']) { const bom=JSON.parse(fs.readFileSync(file,'utf8')); if (bom.bomFormat !== 'CycloneDX' || bom.specVersion !== '1.5' || !bom.metadata?.component?.purl || !Array.isArray(bom.components) || bom.components.length === 0 || bom.components.some((component) => !component.name || !component.version || !component.purl)) process.exit(1); }"
 
       - name: Upload pilot-build SBOM
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: essentials-calls-npm-sbom-${{ github.sha }}
-          path: essentials-calls-npm.cdx.json
+          name: essentials-calls-pilot-sboms-${{ github.sha }}
+          path: |
+            essentials-calls-npm.cdx.json
+            essentials-calls-asterisk.cdx.json
           retention-days: 3
           if-no-files-found: error
 

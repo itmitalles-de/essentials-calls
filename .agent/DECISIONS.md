@@ -5,7 +5,7 @@
 **Decision:** The canonical repository is `itmitalles-de/essentials-calls` and
 the product is Essentials+ Calls. Historical npm/package, persistent path,
 volume, browser-storage, AMI/test, and Asterisk identifiers remain compatible;
-the default branch stays `master` and Asterisk stays on major 18.
+the default branch stays `master`.
 
 **Reason:** Public identity must match the repository rename without risking an
 unrelated workspace/data migration or orphaning installed state. The exact
@@ -46,18 +46,23 @@ sessions, CSRF, and viewer/editor/admin authorization on every API route.
 **Reason:** This is the smallest self-contained single-tenant trust boundary.
 OIDC/Office SSO is explicitly deferred.
 
-## AEAD source secrets and Asterisk 18 HA1 derivatives
+## AEAD source secrets and Asterisk 22 digest derivatives
 
 **Decision:** Encrypt SIP passwords with AES-256-GCM in SQLite and materialize
-them only transiently. Generate Asterisk 18 `md5_cred` HA1 for the fixed
-`asterisk` realm instead of plaintext config.
+them only transiently. Generate Asterisk 22 `auth_type=digest` with a
+pre-computed `password_digest` for the fixed `asterisk` realm instead of
+plaintext config. Keep the algorithm at MD5 only for the pinned synthetic SIPp
+3.6.1 client and declare it explicitly with `supported_algorithms_uas=MD5`.
 
-**Reason:** Asterisk 18 supports HA1 but predates newer `password_digest`.
-This meets the no-plaintext persistent-storage boundary without changing the
-Asterisk major.
+**Reason:** This uses the non-deprecated Asterisk 22 configuration form and
+meets the no-plaintext persistent-storage boundary. SIPp 3.6.1 predates
+SHA-256 digest support; Asterisk 22 with bundled PJProject 2.17 supports
+SHA-256 and SHA-512-256, so MD5 is not a runtime limitation.
 
 **Consequence:** Keys are supplied separately and backed up separately. Strong
-SIP passwords remain mandatory because HA1 can be guessed offline.
+SIP passwords remain mandatory because HA1 can be guessed offline. Moving the
+synthetic client and generated digest contract to SHA-256 is a separate
+hardening change that requires full registration/call requalification.
 
 ## Optimistic concurrency and immutable history
 
@@ -150,11 +155,19 @@ reported restore failure must not leave an installation that violates the
 empty-target retry contract. This is fail-clean handling for caught filesystem
 errors, not a claim of crash-atomic multi-volume storage.
 
-## Pinned Asterisk 18 remains a production blocker
+## Asterisk 22 LTS supersedes the Asterisk 18 pin
 
-**Decision:** Do not perform a major upgrade in this stabilization branch, but
-do not treat the retained Asterisk 18 runtime as production-supported.
+**Decision:** The user's later explicit authorization supersedes the original
+Asterisk-18 boundary. Build exact Asterisk 22.10.1 from checksum-verified source
+with bundled PJProject 2.17 and Jansson 2.15.0, `BUILD_NATIVE` disabled,
+checksum-pinned core/MOH assets, fixed compatibility GID 101, and the existing
+FHS/data paths.
 
-**Reason:** The assigned product boundary requires Asterisk 18 while upstream
-support has ended. Resolving that conflict needs a separately scoped migration
-and full synthetic plus real-world requalification.
+**Reason:** Asterisk 18 is upstream-EOL. Asterisk 22 is the current LTS branch;
+pinning an exact stable release removes the former EOL conflict without using a
+mutable distribution Asterisk package.
+
+**Consequence:** Every runtime evidence class must be rerun on the new image.
+LTS support removes only the old runtime-EOL blocker and does not establish
+carrier, DID, NAT/audio, emergency, legal, operational, or production
+acceptance. No further major upgrade is authorized.

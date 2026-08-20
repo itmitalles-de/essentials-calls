@@ -23,7 +23,7 @@ React/nginx -> authenticated REST + WebSocket -> Express
                                               '--> AMI event/reload connection
                                                         |
                                                         v
-                                            pinned Asterisk 18 <- SIPp
+                                            pinned Asterisk 22 <- SIPp
 ```
 
 ## Invariants
@@ -61,7 +61,7 @@ configuration and manifests; `current` and `last-good` are atomic symlinks.
 
 `npm test` covers shared/backend logic. The three runtime authorities are:
 
-- `npm run test:full-stack`: Asterisk 18 + SIPp + AMI + CDR + restart;
+- `npm run test:full-stack`: Asterisk 22 + SIPp + AMI + CDR + restart;
 - `npm run test:e2e`: Chromium against real Compose services; and
 - `npm run test:backup-restore`: separate source/empty target plus post-restore
   calls, wrong/obsolete key rejection, A-to-C rotation, custom WAV, and RTP.

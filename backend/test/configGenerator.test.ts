@@ -37,7 +37,13 @@ describe('generatePjsipConf', () => {
     const conf = generatePjsipConf(officeTopology());
     assert.match(conf, /\[101\]\ntype=aor/);
     const digest = crypto.createHash('md5').update('101:asterisk:pw-101').digest('hex');
-    assert.match(conf, new RegExp(`\\[101\\]\\ntype=auth\\nauth_type=md5\\nrealm=asterisk\\nusername=101\\nmd5_cred=${digest}`));
+    assert.match(
+      conf,
+      new RegExp(
+        `\\[101\\]\\ntype=auth\\nauth_type=digest\\nrealm=asterisk\\nusername=101\\npassword_digest=MD5:${digest}\\nsupported_algorithms_uas=MD5`
+      )
+    );
+    assert.ok(!conf.includes('md5_cred='), 'generated config must not use the deprecated md5_cred field');
     assert.ok(!conf.includes('pw-101'), 'generated config must not contain a plaintext SIP secret');
     assert.match(conf, /\[101\]\ntype=endpoint/);
     assert.match(conf, /allow=ulaw,alaw\ndirect_media=no/);

@@ -21,7 +21,7 @@ commitment exists for them:
 - billing or tariff accounting
 - additional provider adapters
 - public exposure or customer operation
-- Asterisk major-version migration
+- any further Asterisk major-version migration beyond 22 LTS
 
 A future isolated test-DID evaluation is not a nice-to-have feature and is not
 implemented. Its mandatory external gates and narrow positive allowlist are in

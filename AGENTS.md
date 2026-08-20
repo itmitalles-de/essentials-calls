@@ -1,7 +1,7 @@
 # Repository Agent Guide
 
 Essentials+ Calls is a technical proof-of-concept callflow editor, simulator,
-and isolated synthetic Asterisk 18 runtime.
+and isolated synthetic Asterisk 22 LTS runtime.
 Treat the repository as persistent project memory and the current chat or agent
 session as temporary working memory.
 
@@ -43,7 +43,8 @@ call flow works.
 - `shared/`: topology model, structural/rule validation, and shared fixtures.
 - `backend/`: Express API, topology store, config generation, AMI, and sounds.
 - `frontend/`: React/React Flow editor, API client, audio conversion, and theme.
-- `asterisk/`: Asterisk 18 image, entrypoint, and static config templates.
+- `asterisk/`: checksum-pinned Asterisk 22 image, entrypoint, and static config
+  templates.
 - `docker-compose.yml`: runtime topology, ports, and persistent volumes.
 - `scripts/sip-register-test.py`: real SIP REGISTER diagnostic.
 

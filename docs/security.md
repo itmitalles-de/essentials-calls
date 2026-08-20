@@ -59,11 +59,12 @@ disable their own active session.
 - The one required byte-identical pre-SQLite migration copy is the sole legacy
   plaintext exception. It is mode `0600`, excluded from normal exports and
   backups, and the original `topology.json` is removed only after commit.
-- Asterisk 18 receives an MD5 HA1 digest for the fixed local realm
-  (`username:asterisk:password`) through `auth_type=md5`; generated files do
-  not contain the plaintext SIP password. MD5 HA1 is an Asterisk 18
-  compatibility derivative, not a replacement for strong source passwords or
-  encrypted database storage.
+- Asterisk 22 receives an MD5 HA1 digest for the fixed local realm
+  (`username:asterisk:password`) through `auth_type=digest` and
+  `password_digest`; generated files do not contain the plaintext SIP
+  password. MD5 is retained only for the pinned synthetic SIPp 3.6.1 client,
+  not as a replacement for strong source passwords or encrypted database
+  storage.
 
 ## Master-key lifecycle
 
@@ -116,14 +117,16 @@ positive destination allowlist; a blacklist cannot be its sole control.
 
 - This is not penetration-tested production software.
 - SIP and RTP transport in the test stack are not TLS/SRTP.
-- The local MD5 HA1 derivative is susceptible to offline guessing if weak SIP
-  passwords are chosen.
+- The local MD5 HA1 derivative used by the SIPp 3.6 compatibility contract is
+  susceptible to offline guessing if weak SIP passwords are chosen. Moving the
+  synthetic client and configuration to SHA-256 remains a hardening item.
 - Voicemail policy, customer firewall/NAT, abuse prevention, emergency calls,
   carrier fraud controls, and public exposure are outside the local proof.
-- Asterisk 18 is retained by explicit product constraint although its upstream
-  support has ended; this is a production blocker, not an accepted production
-  risk.
+- Asterisk 22 LTS is upstream-supported, but that removes only the former
+  runtime-EOL blocker. It does not establish carrier, network, security, legal,
+  operational, or production acceptance.
 - Repository Dependabot/vulnerability alerts and enforced SHA-pinning policy
   are not enabled, and no container CVE scanner is configured. CI pins its own
-  action uses and base images and emits an npm SBOM, but repository settings and
-  image-vulnerability governance remain external pilot gates.
+  action uses and base images and emits npm plus pinned Asterisk-source SBOMs,
+  but repository settings and image-vulnerability governance remain external
+  pilot gates.

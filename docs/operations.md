@@ -2,7 +2,7 @@
 
 ## Supported local boundary
 
-The supplied stack is a disposable/local Asterisk 18 environment. Published
+The supplied stack is a disposable/local Asterisk 22 LTS environment. Published
 ports default to loopback:
 
 | Service | Default |
@@ -62,6 +62,7 @@ npm run test:e2e
 npm run test:backup-restore
 npm run scan:secrets
 npm run --silent sbom > essentials-calls-npm.cdx.json
+npm run --silent sbom:asterisk > essentials-calls-asterisk.cdx.json
 git diff --check
 ```
 
@@ -90,15 +91,18 @@ GitHub Actions runs on Ubuntu 24.04 with the exact Node 24 version in `.nvmrc`.
 Third-party actions and Docker bases are pinned to immutable digests/commits;
 the jobs cover static checks, Compose/images, synthetic telephony, Playwright,
 and recovery with read-only repository permissions and synthetic values. The
-static job checks the real PR base/head range for whitespace and creates a
-CycloneDX npm SBOM. The tracked-file secret scan includes the lockfile. Only
-redacted failure diagnostics and the SBOM are uploaded, with three-day
-retention.
+static job checks the real PR base/head range for whitespace and creates
+CycloneDX npm and pinned Asterisk-source SBOMs. The tracked-file secret scan
+includes the lockfile. Only redacted failure diagnostics and the SBOMs are
+uploaded, with three-day retention.
 
-The Ubuntu apt repositories still resolve the Asterisk 18 and SIPp packages at
-image-build time; a repository-wide enforced SHA policy, dependency alerts, and
-container CVE scanning are not configured. These are recorded residual
-supply-chain gates, not hidden by the successful build.
+Asterisk 22.10.1, bundled PJProject 2.17 and Jansson 2.15.0, English core
+prompts, and Opsound music-on-hold are fetched as exact releases and verified
+against checked-in SHA-256 values during the image build. The Ubuntu
+runtime/build packages and the Debian SIPp package still resolve from apt
+repositories at image-build time; a repository-wide enforced SHA policy,
+dependency alerts, and container CVE scanning are not configured. These are
+recorded residual supply-chain gates, not hidden by a successful build.
 
 ## Deploy observation
 

@@ -54,7 +54,7 @@ compose --profile acceptance build asterisk backend frontend acceptance
 compose --profile acceptance up -d --no-build --wait --wait-timeout 180 asterisk backend frontend
 
 startup_log=$(compose logs --no-color asterisk)
-if printf '%s\n' "$startup_log" | grep -Eiq "ERROR.*(generated/current|pjsip\.conf.*invalid|extensions\.conf.*invalid|queues\.conf.*invalid|voicemail\.conf.*invalid)"; then
+if printf '%s\n' "$startup_log" | grep -Eiq "ERROR.*(generated/current|pjsip\.conf.*invalid|extensions\.conf.*invalid|queues\.conf.*invalid|voicemail\.conf.*invalid)|Error loading module|declined to load|Some non-required modules failed to load|Could not find option"; then
   printf 'Asterisk reported a relevant startup configuration error.\n' >&2
   exit 1
 fi

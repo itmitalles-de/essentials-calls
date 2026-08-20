@@ -41,12 +41,12 @@ describe('AMI client protocol', () => {
   test('accepts the Response: Follows form used by CLI commands', async () => {
     const port = await fakeAmi((socket, actionId) => {
       socket.write(
-        `Response: Follows\r\nActionID: ${actionId}\r\nOutput: Asterisk 18.10.0\r\nOutput: --END COMMAND--\r\n\r\n`
+        `Response: Follows\r\nActionID: ${actionId}\r\nOutput: Asterisk 22.10.1\r\nOutput: --END COMMAND--\r\n\r\n`
       );
     });
     const client = new AmiClient('127.0.0.1', port, 'synthetic-user', 'synthetic-secret');
     await client.connect();
-    assert.match(await client.runCommand('core show version'), /Asterisk 18/);
+    assert.match(await client.runCommand('core show version'), /Asterisk 22/);
     client.disconnect();
   });
 

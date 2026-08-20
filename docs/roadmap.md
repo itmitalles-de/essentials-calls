@@ -1,7 +1,7 @@
 # Status, roadmap, and blockers
 
 Status: 2026-08-20. Essentials+ Calls is a single-tenant callflow editor,
-simulator, and isolated synthetic Asterisk 18 runtime: a technically verified
+simulator, and isolated synthetic Asterisk 22 LTS runtime: a technical
 proof of concept, not a production PBX or telephone service.
 
 ## Implemented PoC boundary
@@ -11,8 +11,9 @@ proof of concept, not a production PBX or telephone service.
   bounded save-aware undo/redo.
 - Local viewer/editor/admin accounts, scrypt passwords, sessions, CSRF, rate
   limiting, optimistic concurrency, audit, and SQLite WAL persistence.
-- AES-256-GCM SIP-secret storage, redacted revisions/API/export, Asterisk 18 HA1
-  derivatives, atomic master-key rotation, and separate-key recovery.
+- AES-256-GCM SIP-secret storage, redacted revisions/API/export, Asterisk 22
+  digest HA1 derivatives, atomic master-key rotation, and separate-key
+  recovery.
 - Server-authoritative sound inventory, atomic WAV upload, generated
   configuration, isolated preflight, atomic activation, reload canary, and
   last-known-good rollback.
@@ -44,13 +45,14 @@ approved engineering project:
   backups, maintenance windows, and an operations owner;
 - TLS/SRTP policy, host/network hardening, image vulnerability governance,
   dependency alerts, and enforced repository controls;
-- replacement or separately approved migration of upstream-EOL Asterisk 18,
-  followed by complete requalification; and
+- controlled maintenance of the pinned Asterisk 22/PJProject source chain and
+  complete requalification for every runtime update; and
 - production capacity, availability, RTO/RPO, penetration, carrier, and legal
   acceptance.
 
-These blockers do not authorize scope expansion. Asterisk 18 remains fixed for
-this PoC stabilization even though its support status prevents production use.
+These blockers do not authorize scope expansion. Asterisk 22 LTS removes the
+former Asterisk-18 EOL blocker, but it does not remove any real-world or
+production gate.
 
 ## Possible next controlled milestone
 
@@ -71,8 +73,8 @@ denial. Simulation still would not be carrier acceptance.
 
 No production SIP trunk, real DID, `110`/`112`, billing, tariff accounting,
 multi-tenant cloud PBX, recording, transcription, AI receptionist, contact
-centre, mobile app, Kubernetes, public exposure, Asterisk major upgrade, or
-customer operation is planned or scaffolded here. See
+centre, mobile app, Kubernetes, public exposure, any further Asterisk major
+upgrade, or customer operation is planned or scaffolded here. See
 [NICE_TO_HAVE.md](NICE_TO_HAVE.md) for other deferred ideas.
 
 ## Production release gate
