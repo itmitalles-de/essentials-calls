@@ -1,7 +1,7 @@
 # Essentials+ Calls documentation
 
 This documentation describes the isolated technical proof of concept as of
-2026-08-19. The canonical repository is
+2026-08-20. The canonical repository is
 `itmitalles-de/essentials-calls`. Asterisk stays on the required 18.x base;
 historical npm/data identifiers remain only for compatibility.
 

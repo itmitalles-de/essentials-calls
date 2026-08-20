@@ -1,6 +1,6 @@
 # Status, roadmap, and blockers
 
-Status: 2026-08-19. Essentials+ Calls is a single-tenant callflow editor,
+Status: 2026-08-20. Essentials+ Calls is a single-tenant callflow editor,
 simulator, and isolated synthetic Asterisk 18 runtime: a technically verified
 proof of concept, not a production PBX or telephone service.
 

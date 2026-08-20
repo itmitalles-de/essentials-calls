@@ -137,6 +137,19 @@ C archive, and restore C only with C. The key is never in the archive or audit.
 Transactional interruption injection must leave every row consistently
 repairable with the former key rather than commit a mixed-key state.
 
+## Empty-target restore validates first and rolls back handled write failures
+
+**Decision:** Verify archive integrity, credential decryption, session
+invalidation, and requested sound ownership in staging before target writes.
+Set data/database permissions in the restore operation itself. If ordinary
+target population then fails, remove only restore-owned entries and preserve a
+pre-existing empty target root and its original mode.
+
+**Reason:** Backend startup must not mask an incorrectly restored mode, and a
+reported restore failure must not leave an installation that violates the
+empty-target retry contract. This is fail-clean handling for caught filesystem
+errors, not a claim of crash-atomic multi-volume storage.
+
 ## Pinned Asterisk 18 remains a production blocker
 
 **Decision:** Do not perform a major upgrade in this stabilization branch, but

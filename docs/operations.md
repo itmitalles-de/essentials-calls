@@ -70,9 +70,11 @@ git diff --check
   activated config, verifies rollback, restarts Asterisk/backend, and proves
   persistence. Route assertions cover direct calls, ring group, queue,
   schedule, IVR valid/invalid DTMF and timeout, voicemail, custom WAV, and RTP.
-- `test:e2e` drives Chromium semantically and fails on unexpected console or
-  page errors. Its eight cases include save/undo/redo, graph/table switching,
-  revision/rollback, reload, and a fresh browser-context persistence check.
+- `test:e2e` drives Chromium semantically and fails on unexpected console/page
+  errors, request failures, and HTTP errors outside the exact negative-path
+  method/path/status allowlist. Its eight cases include save/undo/redo,
+  graph/table switching, revision/rollback, reload, and a fresh browser-context
+  persistence check.
 - `test:backup-restore` uses fresh source/A/C projects and volumes, requires a
   wrong key and obsolete key to fail closed, rotates A to C, verifies users,
   roles, revisions, encrypted secrets, audit, session invalidation and file
@@ -88,8 +90,10 @@ GitHub Actions runs on Ubuntu 24.04 with the exact Node 24 version in `.nvmrc`.
 Third-party actions and Docker bases are pinned to immutable digests/commits;
 the jobs cover static checks, Compose/images, synthetic telephony, Playwright,
 and recovery with read-only repository permissions and synthetic values. The
-static job creates a CycloneDX npm SBOM. Only redacted failure diagnostics and
-the SBOM are uploaded, with three-day retention.
+static job checks the real PR base/head range for whitespace and creates a
+CycloneDX npm SBOM. The tracked-file secret scan includes the lockfile. Only
+redacted failure diagnostics and the SBOM are uploaded, with three-day
+retention.
 
 The Ubuntu apt repositories still resolve the Asterisk 18 and SIPp packages at
 image-build time; a repository-wide enforced SHA policy, dependency alerts, and

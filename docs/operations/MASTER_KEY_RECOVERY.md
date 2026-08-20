@@ -58,7 +58,12 @@ For restore, run the built `restore --input <archive>` CLI with `DATA_DIR`,
 `SOUNDS_DIR`, `CONFIG_OUT_DIR`, `SOUNDS_READER_GID`, and exactly one approved
 master-key source. The CLI validates the complete archive before populating the
 empty target, materialises credentials, invalidates all copied sessions, sets
-data/database/sound permissions, and records `backup.restore`.
+data/database/sound permissions, and records `backup.restore`. Key and sound
+ownership checks happen in staging. Data mode `0700`, database mode `0600`,
+and sound modes/reader group are applied by restore before it reports success,
+not deferred to backend startup. A caught target-population error removes the
+entries written by that attempt and restores the mode of a pre-existing empty
+target root so the retry contract remains unambiguous.
 
 For rotation, keep normal writes stopped, provide the old key through
 `PBX_MASTER_KEY_FILE` and new key C through `PBX_NEW_MASTER_KEY_FILE`, run the
@@ -84,4 +89,6 @@ sharing.
 This rehearsal proves application-level recovery in disposable local containers.
 It does not prove an external secret manager, off-site custody, production RTO/
 RPO, hardware compromise recovery, carrier credential rotation, or an operator
-runbook under incident conditions. Those remain pilot/production gates.
+runbook under incident conditions. The handled-error cleanup is not a
+cross-filesystem crash-atomicity or power-loss guarantee. Those remain
+pilot/production gates.

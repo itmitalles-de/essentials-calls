@@ -41,9 +41,12 @@ generated-config targets. Before copying anything it:
 
 Only then are the database, sounds, generated versions, and known-good links
 copied into their empty targets. Restored sessions are invalidated and custom
-sound directories/files retain mode `0750`/`0640` with the configured Asterisk
-reader group. A corrupt archive, wrong key, or non-empty destination leaves the
-target untouched.
+sound directories/files receive mode `0750`/`0640` with the configured Asterisk
+reader group. Restore itself sets data/database mode `0700`/`0600` before it
+returns; this is verified before any backend constructor can normalize modes as
+a side effect. A corrupt archive, wrong key, invalid reader group, or non-empty
+destination leaves the target untouched. A caught population failure removes
+restore-owned entries and preserves a pre-existing empty target root and mode.
 
 ## Automated evidence
 
@@ -59,7 +62,9 @@ The same rehearsal atomically rotates A to C, verifies every encrypted value,
 creates a new backup, requires obsolete A to fail, restores with C into another
 set of empty volumes, and repeats recovery/runtime assertions. Unit injection of
 an interrupted rotation proves transaction rollback leaves an unambiguous
-old-key-repairable state. Audit contains restore/rotation facts but no key value.
+old-key-repairable state. A separate unit fault proves a handled target write
+failure is cleaned up for retry. Audit contains restore/rotation facts but no
+key value.
 See [operations/MASTER_KEY_RECOVERY.md](operations/MASTER_KEY_RECOVERY.md).
 
 This proves deterministic local recovery only. It does not prove off-site

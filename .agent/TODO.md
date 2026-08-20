@@ -2,11 +2,12 @@
 
 ## Now
 
-- [ ] Review the stabilization draft PR and require every GitHub Actions job to
-  pass before considering merge. Do not treat CI as production approval.
-- [ ] Review the documented residual supply-chain gates: repository-enforced
-  SHA policy, dependency alerts, container CVE scanning, and mutable Ubuntu apt
-  resolution for Asterisk/SIPp.
+- [ ] Keep stabilization PR #3 in draft until every GitHub Actions job passes on
+  the final follow-up head and a human reviews the complete diff. Do not treat
+  CI as production approval.
+- [ ] Choose and fund the remaining supply-chain controls: repository-enforced
+  SHA policy, dependency/secret/code alerts, container CVE scanning, and a
+  reproducible package source for the Asterisk/SIPp apt dependencies.
 - [ ] Keep the isolated test-DID pilot blocked until every external gate in
   `docs/PILOT_TEST_DID.md` has a named owner, evidence, one positively
   allowlisted ordinary test number, and an approved maintenance window.
