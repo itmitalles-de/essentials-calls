@@ -25,6 +25,8 @@
     "test:e2e": "sh scripts/browser-e2e.sh",
     "test:backup-restore": "sh scripts/backup-restore-acceptance.sh",
     "validate:compose-images": "sh scripts/validate-compose-images.sh",
+    "validate:supply-chain": "node scripts/validate-supply-chain-pins.mjs",
+    "scan:containers": "sh scripts/container-cve-scan.sh",
     "scan:secrets": "sh scripts/secret-scan.sh",
     "sbom": "npm sbom --sbom-format=cyclonedx",
     "sbom:asterisk": "node scripts/asterisk-sbom.mjs",

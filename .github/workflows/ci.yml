@@ -31,6 +31,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Immutable supply-chain references
+        run: npm run validate:supply-chain
+
       - name: Dependency advisories
         run: npm audit --audit-level=moderate
 
@@ -75,7 +78,7 @@ jobs:
 
   docker:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -89,6 +92,9 @@ jobs:
 
       - name: Build all compose images
         run: docker compose -f docker-compose.yml -f docker-compose.acceptance.yml --profile acceptance build
+
+      - name: Fail-closed runtime container CVE gate
+        run: npm run scan:containers
 
   synthetic-telephony:
     runs-on: ubuntu-24.04
