@@ -68,6 +68,10 @@
   224-component npm and 6-component Asterisk CycloneDX SBOM generation,
   worktree whitespace validation, and base-to-head PR whitespace validation
   passed.
+- GitHub Actions is externally blocked before any job step by the account's
+  failed-payment or spending-limit gate. Repeated review-head runs show five
+  zero-step failures; there is no successful final-head CI evidence yet, so PR
+  #3 remains a draft.
 
 ## Evidence boundary and residual gates
 

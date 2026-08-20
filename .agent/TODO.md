@@ -3,8 +3,9 @@
 ## Now
 
 - [ ] Keep stabilization PR #3 in draft until every GitHub Actions job passes on
-  the final follow-up head and a human reviews the complete diff. Do not treat
-  CI as production approval.
+  the final follow-up head and a human reviews the complete diff. Current jobs
+  are rejected with zero steps by the external account payment/spending-limit
+  gate; resolve that gate and rerun. Do not treat CI as production approval.
 - [ ] Choose and fund the remaining supply-chain controls: repository-enforced
   SHA policy, dependency/secret/code alerts, container CVE scanning, and a
   reproducible package source for the remaining Ubuntu runtime/build and SIPp
