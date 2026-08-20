@@ -77,6 +77,10 @@ RUN mkdir -p third-party/cache \
     && install -D -m 0644 third-party/jansson/source/LICENSE \
       /opt/asterisk-root/usr/share/doc/jansson/LICENSE
 
+# The runtime base exposes /var/run as a symlink to /run. Asterisk creates its
+# volatile control directory at startup, so omit it from the staged root.
+RUN rm -rf /opt/asterisk-root/var/run
+
 ARG MOH_VERSION=2.03
 ARG MOH_SHA256=449fb810d16502c3052fedf02f7e77b36206ac5a145f3dacf4177843a2fcb538
 
