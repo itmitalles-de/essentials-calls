@@ -6,6 +6,7 @@ import { APIRequestContext, Page, Response, expect, request, test } from '@playw
 const repositoryRoot = path.resolve(process.cwd());
 const browserBase = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18180';
 const apiBase = `${(process.env.E2E_API_URL ?? 'http://127.0.0.1:14100/api').replace(/\/$/, '')}/`;
+const expectedSipPort = process.env.PBX_SIP_PORT ?? '15160';
 const admin = {
   username: process.env.E2E_ADMIN_USERNAME ?? 'synthetic-e2e-admin',
   password: process.env.E2E_ADMIN_PASSWORD ?? 'SyntheticE2eAdmin-2026!',
@@ -339,7 +340,7 @@ test.describe.serial('Simple Calls browser acceptance', () => {
       await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     }
     await expect(page.getByRole('definition').filter({ hasText: '127.0.0.1' })).toBeVisible();
-    await expect(page.getByRole('definition').filter({ hasText: '15160' })).toBeVisible();
+    await expect(page.getByRole('definition').filter({ hasText: expectedSipPort })).toBeVisible();
     await expect(page.locator('body')).not.toContainText('synthetic-alice-101');
     await page.getByRole('button', { name: 'Extension im Callflow öffnen' }).click();
     await expect(page.getByLabel('Callflow-Graph')).toBeVisible();
