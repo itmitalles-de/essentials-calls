@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://itmitalles.de/schemas/essentials-calls/topology-v2.schema.json",
+  "$id": "https://itmitalles.de/schemas/simple-calls/topology-v2.schema.json",
   "title": "Simple Calls topology export v2",
   "type": "object",
   "additionalProperties": false,

@@ -1,6 +1,6 @@
 # Repository Agent Guide
 
-Essentials+ Calls is a technical proof-of-concept callflow editor, simulator,
+Simple Calls is a technical proof-of-concept callflow editor, simulator,
 and isolated synthetic Asterisk 22 LTS runtime.
 Treat the repository as persistent project memory and the current chat or agent
 session as temporary working memory.

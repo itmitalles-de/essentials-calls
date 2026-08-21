@@ -2,14 +2,17 @@
 
 ## Now
 
-- [ ] Keep stabilization PR #3 in draft until every GitHub Actions job passes on
-  the final follow-up head and a human reviews the complete diff. Current jobs
-  are rejected with zero steps by the external account payment/spending-limit
-  gate; resolve that gate and rerun. Do not treat CI as production approval.
+- [ ] Keep stabilization PR #3 in draft until a human reviews the complete diff.
+  All hosted CI jobs are green at `219361ce`; this is still not production
+  approval and the PR must not be merged automatically.
+- [ ] Open and review the separate stacked draft PR from
+  `agent/simple-calls-ui-softphones` to `stabilize/calls-verified-poc`, then
+  close draft PR #24 as superseded. Do not repurpose #24 or target `master`
+  before the stabilization dependency is resolved.
 - [ ] Before 2026-09-20, refresh the Debian snapshots or otherwise remediate
   the 15 explicitly recorded unfixed CVE IDs, rerun all image/runtime suites,
   and remove or narrowly renew the exception with human security review.
-- [ ] Decide whether to fund GitHub Advanced Security or another managed
+- [ ] Decide whether GitHub Advanced Security or another managed
   secret/code-scanning service. Repository SHA enforcement, Dependabot alerts,
   automated fixes, weekly update configuration, package snapshots, local
   secret scanning, SBOMs, and the container gate are implemented; managed

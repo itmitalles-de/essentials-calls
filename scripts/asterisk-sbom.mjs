@@ -37,7 +37,7 @@ const ubuntuImage = ubuntuImageMatch[1];
 const ubuntu = ubuntuImage.match(/^ubuntu:([^@]+)@sha256:([0-9a-f]{64})$/);
 if (!ubuntu) throw new Error('Ubuntu base image must pin an exact sha256 digest.');
 
-const rootRef = `pkg:oci/essentials-calls-asterisk@${asteriskVersion}`;
+const rootRef = `pkg:oci/simple-calls-asterisk@${asteriskVersion}`;
 const components = [
   sha256Component({
     type: 'operating-system',
@@ -47,8 +47,8 @@ const components = [
     purl: `pkg:oci/ubuntu@${ubuntu[1]}`,
     url: `https://hub.docker.com/_/ubuntu`,
     properties: [
-      { name: 'essentials-calls:oci-reference', value: ubuntuImage },
-      { name: 'essentials-calls:apt-snapshot', value: dockerArg('UBUNTU_APT_SNAPSHOT') },
+      { name: 'simple-calls:oci-reference', value: ubuntuImage },
+      { name: 'simple-calls:apt-snapshot', value: dockerArg('UBUNTU_APT_SNAPSHOT') },
     ],
   }),
   sha256Component({
@@ -66,7 +66,7 @@ const components = [
     checksum: dockerArg('PJPROJECT_SHA256'),
     purl: `pkg:generic/pjproject@${pjprojectVersion}`,
     url: `https://raw.githubusercontent.com/asterisk/third-party/${pjprojectCommit}/pjproject/${pjprojectVersion}/pjproject-${pjprojectVersion}.tar.bz2`,
-    properties: [{ name: 'essentials-calls:source-commit', value: pjprojectCommit }],
+    properties: [{ name: 'simple-calls:source-commit', value: pjprojectCommit }],
   }),
   sha256Component({
     type: 'library',
@@ -75,7 +75,7 @@ const components = [
     checksum: dockerArg('JANSSON_SHA256'),
     purl: `pkg:generic/jansson@${janssonVersion}`,
     url: `https://raw.githubusercontent.com/asterisk/third-party/${pjprojectCommit}/jansson/${janssonVersion}/jansson-${janssonVersion}.tar.bz2`,
-    properties: [{ name: 'essentials-calls:source-commit', value: pjprojectCommit }],
+    properties: [{ name: 'simple-calls:source-commit', value: pjprojectCommit }],
   }),
   sha256Component({
     name: 'Asterisk English core sounds (GSM)',
@@ -101,7 +101,7 @@ const bom = {
   version: 1,
   metadata: {
     timestamp: new Date().toISOString(),
-    tools: [{ vendor: 'itmitalles-de', name: 'essentials-calls-asterisk-sbom', version: '1' }],
+    tools: [{ vendor: 'itmitalles-de', name: 'simple-calls-asterisk-sbom', version: '1' }],
     component: {
       type: 'container',
       'bom-ref': rootRef,

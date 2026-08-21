@@ -188,7 +188,7 @@ export function createTopologyRouter(database: PbxDatabase): Router {
 
   router.get('/topology/export', requireRole('viewer'), (_req, res) => {
     const current = database.currentTopology();
-    res.setHeader('Content-Disposition', `attachment; filename="essentials-calls-topology-r${current.revision}.json"`);
+    res.setHeader('Content-Disposition', `attachment; filename="simple-calls-topology-r${current.revision}.json"`);
     res.json(createTopologyExport(current.topology));
   });
 

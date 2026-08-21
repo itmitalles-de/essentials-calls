@@ -1,9 +1,8 @@
 # Verification matrix
 
-Snapshot: 2026-08-20 on branch `stabilize/calls-verified-poc`, verified tree
-`fd4c58df2e47ad59bb78b7da2e782a251ab13aed` with Asterisk runtime-content
-commit `4a5bad7afe6768163e8ba6e24a17afe1b5ce8e6d` (baseline
-`d88e8e54e7591bedd667e072737426c840c4160d`).
+Snapshot: 2026-08-22 on branch `agent/simple-calls-ui-softphones`, verified
+implementation commit `9f5b32ead2956e1944544e3630f5dc698581e6ba`
+(stabilization baseline `219361ce5a2b4d1f128ce02948bdfc648a696283`).
 “Passed” applies only to the named evidence class and never promotes a result
 to a real-carrier, DID, telephone-network, or production claim.
 
@@ -12,6 +11,7 @@ to a real-carrier, DID, telephone-network, or production claim.
 | Authentication, CSRF, roles, rate limit | Passed | API passed | N/A | Indirect | Passed | Three roles restored; sessions invalidated | Not run | N/A | Not run | None |
 | Topology, revisions, conflict, rollback | Passed | API/database/deploy passed | Route topology used | Active/last-good passed | Passed | Revisions and pointers restored | Not run | Not run | Not run | None |
 | Save/undo/redo/dirty-state contract | 5 frontend tests passed | N/A | N/A | N/A | Passed: pre/post-save, graph/table, reload, fresh context | Persisted revision reloaded | N/A | N/A | N/A | None |
+| Simple Business shell, themes, softphone guidance | 2 URL-allowlist tests passed | Service metadata passed | N/A | Endpoint metadata only | Desktop/mobile navigation, theme, official links, no secret output passed | N/A | Not run | Not run | Not run | None |
 | AES-GCM SIP secrets and HA1 derivative | Passed | Wrong key/tamper/materialisation passed | Registration passed | HA1 config loaded | Masked/admin flow passed | A/B/C fail-closed and rotation passed | Not run | Not run | Not run | None |
 | Atomic deploy, reload, corrupt activation, rollback | Passed | Passed | Calls after reload passed | Preflight/canary/rollback passed | Valid/invalid deploy passed | Active config/calls restored | Not run | Not run | Not run | None |
 | Custom WAV, permissions, IVR playback, RTP | Passed | Inventory/upload passed | 56 RTP packets observed | Custom prompt executed | Upload/reference/delete passed | Passed after A and C restores; `0750`/`0640` and reader GID | Not run | Not run | Synthetic only | None |
@@ -33,19 +33,21 @@ to a real-carrier, DID, telephone-network, or production claim.
   explicitly pinned install-script approvals.
 - Advisory scan: `npm audit --audit-level=moderate` reported zero
   vulnerabilities.
-- Static suites: typecheck and production build passed; 30 shared, 70 backend,
-  and 5 frontend tests passed (105 total), with zero skips/TODOs.
+- Static suites: design-contract lint, typecheck, and production build passed;
+  30 shared, 70 backend, and 7 frontend tests passed (107 total), with zero
+  skips/TODOs.
 - Compose: ordinary and acceptance models validated with synthetic required
   variables; the policy check found three ordinary and four acceptance images,
   all with explicit project-isolated version tags and none with `latest`;
   Asterisk, backend, frontend, and SIPp acceptance images built from
   digest-pinned bases.
 - Full stack: 28 semantic checks passed, followed by Asterisk/backend restart
-  and exact SQLite/active-deployment persistence checks; the complete successful
-  run took approximately 99 seconds.
+  and exact SQLite/active-deployment persistence checks. The successful rerun
+  used its own Compose project, volumes, and host-port range; an earlier start
+  detected and preserved an unrelated process already using port 18080.
 - Browser: Playwright 1.62.1 with Chrome for Testing 151.0.7922.34 ran all
-  eight tests in 32.2 seconds (approximately 57 seconds including the isolated
-  stack lifecycle): 8/8 passed, zero skips/TODOs, no unexpected console/page
+  eight tests in 39.4 seconds: 8/8 passed, zero skips/TODOs, no unexpected
+  console/page
   errors, unallowlisted HTTP errors, failed requests, or unhandled browser
   promise rejection.
 - Recovery: a fresh source ran 27 semantic checks; wrong key B failed closed;
@@ -56,11 +58,11 @@ to a real-carrier, DID, telephone-network, or production claim.
   pre-start data/database modes, Asterisk startup, custom WAV/permissions, IVR
   playback, 56 observed RTP packets, semantic call routes, CDR, and WebSocket
   assertions. Unit fault injection additionally proved cleanup after target
-  population failure. The complete orchestration took approximately 192
-  seconds.
+  population failure. Source, target, and rotated restores used unique Compose
+  projects, empty volumes, and non-overlapping host/RTP ranges.
 - Supply-chain checks: immutable action/base/helper-image references, explicit
   versioned Compose build tags with a fail-closed no-`latest` policy,
-  tracked-file high-confidence secret scan including the lockfile, 224-component
+  tracked-file high-confidence secret scan including the lockfile, 226-component
   npm and 6-component pinned Asterisk-source CycloneDX SBOM generation,
   worktree whitespace validation, and base-to-head PR whitespace validation
   passed. Exact direct apt versions resolved from named Ubuntu/Debian snapshots;

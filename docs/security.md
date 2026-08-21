@@ -2,7 +2,7 @@
 
 ## Boundary
 
-Essentials+ Calls is a single-tenant local application. The application
+Simple Calls is a single-tenant local application. The application
 protects its HTTP/API boundary, persistent topology data, SIP credentials, and
 administrative actions. The supplied Compose stack binds published ports to
 loopback by default and is not a public deployment template.

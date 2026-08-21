@@ -90,7 +90,7 @@ afterEach(async () => {
 });
 
 describe('authentication and authorization API', () => {
-  test('publishes an unauthenticated, topology-free Office service contract', async () => {
+  test('publishes an unauthenticated, topology-free Simple Business service contract', async () => {
     for (const route of ['/health', '/ready', '/api/service']) {
       const response = await client().request(route);
       assert.equal(response.status, 200);

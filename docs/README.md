@@ -1,8 +1,8 @@
-# Essentials+ Calls documentation
+# Simple Calls documentation
 
 This documentation describes the isolated technical proof of concept as of
-2026-08-20. The canonical repository is
-`itmitalles-de/essentials-calls`. The synthetic runtime uses checksum-pinned
+2026-08-22. The canonical repository is
+`itmitalles-de/simple-calls`. The synthetic runtime uses checksum-pinned
 Asterisk 22.10.1 LTS; historical npm/data identifiers remain only for
 compatibility.
 

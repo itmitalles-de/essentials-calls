@@ -1,7 +1,7 @@
 # Follow-up Codex prompt
 
-Work autonomously in `itmitalles-de/essentials-calls`. Preserve the product
-name **Essentials+ Calls**, the compatibility identifiers documented in
+Work autonomously in `itmitalles-de/simple-calls`. Preserve the product
+name **Simple Calls**, the compatibility identifiers documented in
 `docs/COMPATIBILITY_IDENTIFIERS.md`, default branch `master`, and the
 checksum-pinned Asterisk 22.10.1 LTS source runtime.
 

@@ -14,7 +14,7 @@ commitment exists for them:
 - multi-tenant/cloud PBX or multiple PBX instances
 - high availability or Kubernetes
 - mobile application
-- OIDC/SSO with Essentials+ Office
+- OIDC/SSO with Simple Business
 - external holiday calendars
 - CRM integrations
 - fax or SMS

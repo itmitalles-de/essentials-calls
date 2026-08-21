@@ -25,7 +25,7 @@ The current export envelope is schema v2:
 ```json
 {
   "schemaVersion": 2,
-  "product": "Essentials+ Calls",
+  "product": "Simple Calls",
   "exportedAt": "…",
   "redacted": true,
   "topology": {}
