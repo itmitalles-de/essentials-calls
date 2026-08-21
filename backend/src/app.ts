@@ -6,8 +6,8 @@ import { createTopologyRouter } from './api/routes/topology';
 import { createSoundsRouter } from './api/routes/sounds';
 
 export const PRODUCT = {
-  name: 'Essentials+ Calls',
-  version: '0.2.0',
+  name: 'Simple Calls',
+  version: '0.3.0',
   apiVersion: 'v1',
   capabilityIds: [
     'calls.topology',
@@ -17,9 +17,27 @@ export const PRODUCT = {
     'calls.schedule',
     'calls.status.events',
     'calls.backup',
+    'calls.softphones.guidance',
   ],
   authMode: 'local-session',
 } as const;
+
+function sipClientEndpoint() {
+  const configuredHost = (process.env.PBX_CLIENT_SIP_HOST ?? '127.0.0.1').trim();
+  const host = /^[a-zA-Z0-9.:[\]-]+$/.test(configuredHost) ? configuredHost : '127.0.0.1';
+  const configuredPort = Number(process.env.PBX_CLIENT_SIP_PORT ?? '5060');
+  const port = Number.isInteger(configuredPort) && configuredPort > 0 && configuredPort <= 65_535 ? configuredPort : 5060;
+  return {
+    host,
+    port,
+    transport: 'udp' as const,
+    scope: host === '127.0.0.1' || host === '::1' || host === 'localhost' ? 'loopback-only' as const : 'configured-isolated' as const,
+  };
+}
+
+function serviceInfo() {
+  return { ...PRODUCT, sipClientEndpoint: sipClientEndpoint() };
+}
 
 export function createApp(database: PbxDatabase) {
   validateAuthConfiguration();
@@ -41,20 +59,20 @@ export function createApp(database: PbxDatabase) {
   app.use(authMiddleware(database));
   app.use('/api', csrfProtection);
 
-  const health = (_req: Request, res: Response) => res.json({ ok: true, product: PRODUCT.name, ...PRODUCT });
+  const health = (_req: Request, res: Response) => res.json({ ok: true, product: PRODUCT.name, ...serviceInfo() });
   const ready = (_req: Request, res: Response) => {
     try {
       database.db.prepare('SELECT 1').get();
-      res.json({ ready: true, product: PRODUCT.name, ...PRODUCT, components: { database: 'ready' } });
+      res.json({ ready: true, product: PRODUCT.name, ...serviceInfo(), components: { database: 'ready' } });
     } catch {
-      res.status(503).json({ ready: false, product: PRODUCT.name, ...PRODUCT, components: { database: 'unavailable' } });
+      res.status(503).json({ ready: false, product: PRODUCT.name, ...serviceInfo(), components: { database: 'unavailable' } });
     }
   };
   app.get('/health', health);
   app.get('/ready', ready);
   app.get('/api/health', health);
   app.get('/api/ready', ready);
-  app.get('/api/service', (_req, res) => res.json(PRODUCT));
+  app.get('/api/service', (_req, res) => res.json(serviceInfo()));
 
   app.use('/api', createAuthRouter(database));
   app.use('/api', createSoundsRouter(database));

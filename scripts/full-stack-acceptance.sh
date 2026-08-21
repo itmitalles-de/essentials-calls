@@ -73,4 +73,4 @@ compose --profile acceptance run --rm \
   acceptance
 
 completed=true
-printf 'Essentials+ Calls full-stack acceptance passed (synthetic local telephony only).\n'
+printf 'Simple Calls full-stack acceptance passed (synthetic local telephony only).\n'

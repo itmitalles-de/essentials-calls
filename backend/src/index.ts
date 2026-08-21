@@ -16,9 +16,9 @@ try {
   });
 
   server.listen(PORT, () => {
-    console.log(`Essentials+ Calls backend listening on :${PORT}`);
+    console.log(`Simple Calls backend listening on :${PORT}`);
   });
 } catch (error) {
-  console.error(`Essentials+ Calls refused to start: ${(error as Error).message}`);
+  console.error(`Simple Calls refused to start: ${(error as Error).message}`);
   process.exitCode = 1;
 }

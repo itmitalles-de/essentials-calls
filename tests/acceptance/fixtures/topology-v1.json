@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "topology": {
     "id": "synthetic-acceptance-topology",
-    "name": "Essentials+ Calls synthetic acceptance",
+    "name": "Simple Calls synthetic acceptance",
     "description": "Disposable local callflow; contains no provider, DID or real endpoint data.",
     "nodes": [
       {

@@ -1,4 +1,4 @@
-// Essentials+ Calls domain model.
+// Simple Calls domain model.
 // Mirrors the design agreed for the callflow editor: topology = nodes + edges + memberships,
 // status is a separate, non-persisted model pushed over WebSocket.
 
@@ -177,7 +177,7 @@ export const TOPOLOGY_SCHEMA_VERSION = 2 as const;
 
 export interface TopologyExport {
   schemaVersion: typeof TOPOLOGY_SCHEMA_VERSION;
-  product: 'Essentials+ Calls';
+  product: 'Simple Calls';
   exportedAt: string;
   redacted: boolean;
   topology: Topology;

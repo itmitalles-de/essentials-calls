@@ -68,6 +68,8 @@ function mutationHeaders(session: ApiSession, extra: Record<string, string> = {}
 
 async function loginPage(page: Page, username = admin.username, password = admin.password): Promise<void> {
   await page.goto('/');
+  await expect(page).toHaveTitle(/Simple Calls/);
+  await expect(page.getByRole('heading', { name: 'Simple Calls' })).toBeVisible();
   await page.getByLabel('Benutzername').fill(username);
   await page.getByLabel('Passwort').fill(password);
   await page.getByRole('button', { name: 'Anmelden' }).click();
@@ -119,7 +121,7 @@ function compose(...args: string[]): void {
   );
 }
 
-test.describe.serial('Essentials+ Calls browser acceptance', () => {
+test.describe.serial('Simple Calls browser acceptance', () => {
   test.beforeEach(async ({ page }) => {
     monitorBrowserFailures(page);
   });
@@ -184,9 +186,9 @@ test.describe.serial('Essentials+ Calls browser acceptance', () => {
     await page.getByLabel('Nummer', { exact: true }).fill('199');
     await page.getByLabel('SIP User', { exact: true }).fill('199');
 
-    await page.getByRole('button', { name: 'Tabelle' }).click();
+    await page.getByRole('tab', { name: 'Tabelle' }).click();
     await expect(page.getByRole('table', { name: 'Nodes' }).locator('tbody tr').last().locator('input').first()).toHaveValue('E2E Extension');
-    await page.getByRole('button', { name: 'Graph' }).click();
+    await page.getByRole('tab', { name: 'Graph' }).click();
     await selectGraphNode(page, 'E2E Extension');
     await page.getByRole('button', { name: 'Speichern' }).click();
     await expect(page.getByText('Als neue Revision gespeichert.', { exact: true })).toBeVisible();
@@ -217,7 +219,7 @@ test.describe.serial('Essentials+ Calls browser acceptance', () => {
 
     // Graph/table transitions and edge operations use the same topology and do
     // not compromise node history.
-    await page.getByRole('button', { name: 'Tabelle' }).click();
+    await page.getByRole('tab', { name: 'Tabelle' }).click();
     const edgeRows = page.getByRole('table', { name: 'Edges' }).locator('tbody tr');
     const initialEdgeCount = await edgeRows.count();
     await page.getByRole('button', { name: '+ Edge', exact: true }).click();
@@ -225,7 +227,7 @@ test.describe.serial('Essentials+ Calls browser acceptance', () => {
     await edgeRows.last().getByRole('button', { name: 'löschen' }).click();
     await expect(edgeRows).toHaveCount(initialEdgeCount);
 
-    await page.getByRole('button', { name: 'Graph' }).click();
+    await page.getByRole('tab', { name: 'Graph' }).click();
     await selectGraphNode(page, 'E2E Extension');
     await page.getByRole('button', { name: 'Node löschen' }).click();
     await expect(page.getByText('E2E Extension', { exact: true })).toHaveCount(0);
@@ -281,7 +283,7 @@ test.describe.serial('Essentials+ Calls browser acceptance', () => {
     const download = await downloadPromise;
     const exported = JSON.parse(await readFile(await download.path(), 'utf8')) as Record<string, unknown>;
     expect(exported.schemaVersion).toBe(2);
-    expect(exported.product).toBe('Essentials+ Calls');
+    expect(exported.product).toBe('Simple Calls');
     expect(exported.redacted).toBe(true);
     expect(JSON.stringify(exported)).not.toContain('sipPassword');
 
@@ -301,8 +303,8 @@ test.describe.serial('Essentials+ Calls browser acceptance', () => {
     await page.getByRole('button', { name: 'Speichern' }).click();
     await expect(page.getByText('Als neue Revision gespeichert.', { exact: true })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Tabelle' }).click();
-    await page.getByRole('button', { name: 'Graph' }).click();
+    await page.getByRole('tab', { name: 'Tabelle' }).click();
+    await page.getByRole('tab', { name: 'Graph' }).click();
     await page.getByText('Synthetic IVR', { exact: true }).click();
     await expect(page.getByText('Referenziert von: Synthetic IVR')).toBeVisible();
     await page.getByRole('button', { name: 'Löschen', exact: true }).click();
@@ -313,14 +315,34 @@ test.describe.serial('Essentials+ Calls browser acceptance', () => {
     await expect(page.getByLabel('Begrüßungsreferenz')).toHaveValue('hello-world');
   });
 
-  test('theme preference persists across a reload', async ({ page }) => {
+  test('theme preference persists and official softphone guidance stays secret-free', async ({ page }) => {
     await loginPage(page);
-    const toggle = page.getByRole('button', { name: /^Design umschalten/ });
-    await toggle.click();
-    await toggle.click();
+    await page.getByRole('button', { name: 'Einstellungen' }).click();
+    await page.getByRole('radio', { name: 'Dunkel' }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await expect(page.locator('html')).toHaveAttribute('data-sb-theme', 'dark');
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+
+    await page.getByRole('button', { name: 'Geräte & Softphones' }).click();
+    await expect(page.getByRole('heading', { name: 'Geräte & Softphones' })).toBeVisible();
+    const downloads = page.getByRole('link', { name: /offizielle Download-Seite öffnen/ });
+    await expect(downloads).toHaveCount(3);
+    for (const [name, href] of [
+      ['Linphone', 'https://www.linphone.org/en/download/'],
+      ['MicroSIP', 'https://www.microsip.org/downloads'],
+      ['Zoiper', 'https://www.zoiper.com/en/voip-softphone/download/current'],
+    ] as const) {
+      const link = page.getByRole('link', { name: `${name} – offizielle Download-Seite öffnen` });
+      await expect(link).toHaveAttribute('href', href);
+      await expect(link).toHaveAttribute('target', '_blank');
+      await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    }
+    await expect(page.getByRole('definition').filter({ hasText: '127.0.0.1' })).toBeVisible();
+    await expect(page.getByRole('definition').filter({ hasText: '15160' })).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('synthetic-alice-101');
+    await page.getByRole('button', { name: 'Extension im Callflow öffnen' }).click();
+    await expect(page.getByLabel('Callflow-Graph')).toBeVisible();
   });
 
   test('admin user management and viewer/editor UI rights follow server roles', async ({ page }) => {
@@ -393,7 +415,7 @@ test.describe.serial('Essentials+ Calls browser acceptance', () => {
     await page.getByRole('button', { name: 'Revisionen' }).click();
     await page.getByRole('button', { name: `Auf r${targetRevision} zurückrollen` }).click();
     await expect(page.getByRole('status')).toContainText(new RegExp(`Revision ${targetRevision} als neue Revision \\d+ wiederhergestellt`));
-    await page.getByRole('button', { name: 'Graph' }).click();
+    await page.getByRole('button', { name: 'Callflow', exact: true }).click();
     await expect(page.getByText(originalLabel, { exact: true })).toBeVisible();
   });
 

@@ -48,12 +48,13 @@ export function useTheme(): {
 
   useEffect(() => {
     const root = document.documentElement;
+    root.setAttribute('data-sb-theme', resolved);
     if (preference === 'system') {
       root.removeAttribute('data-theme');
     } else {
       root.setAttribute('data-theme', preference);
     }
-  }, [preference]);
+  }, [preference, resolved]);
 
   const setPreference = useCallback((next: ThemePreference) => {
     setPreferenceState(next);

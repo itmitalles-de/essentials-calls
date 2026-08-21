@@ -105,7 +105,7 @@ const bom = {
     component: {
       type: 'container',
       'bom-ref': rootRef,
-      name: 'Essentials+ Calls synthetic Asterisk runtime',
+      name: 'Simple Calls synthetic Asterisk runtime',
       version: asteriskVersion,
       purl: rootRef,
     },

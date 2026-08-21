@@ -8,7 +8,7 @@ describe('versioned topology import/export', () => {
     const source = topology({ nodes: [extension('ext', '101', { sipPassword: 'synthetic-export-secret' })] });
     const exported = createTopologyExport(source, new Date('2026-08-13T00:00:00Z'));
     assert.equal(exported.schemaVersion, 2);
-    assert.equal(exported.product, 'Essentials+ Calls');
+    assert.equal(exported.product, 'Simple Calls');
     assert.ok(!JSON.stringify(exported).includes('synthetic-export-secret'));
     assert.equal(exported.topology.nodes[0].type === 'extension' && exported.topology.nodes[0].properties.sipSecret?.configured, true);
   });

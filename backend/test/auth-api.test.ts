@@ -98,7 +98,8 @@ describe('authentication and authorization API', () => {
       const body = JSON.parse(raw) as {
         name: string; version: string; apiVersion: string; capabilityIds: string[]; authMode: string;
       };
-      assert.equal(body.name, 'Essentials+ Calls');
+      assert.equal(body.name, 'Simple Calls');
+      assert.ok(body.capabilityIds.includes('calls.softphones.guidance'));
       assert.match(body.version, /^\d+\.\d+\.\d+$/);
       assert.equal(body.apiVersion, 'v1');
       assert.equal(body.authMode, 'local-session');

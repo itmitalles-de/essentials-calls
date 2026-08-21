@@ -14,24 +14,39 @@ export PBX_MASTER_KEY=$KEY_A
 export ACCEPTANCE_ADMIN_PASSWORD=${ACCEPTANCE_ADMIN_PASSWORD:-SyntheticBackupAdmin-2026!}
 export ACCEPTANCE_EXPECT_ROLLBACK=false
 export PBX_ENV=test
+SOURCE_BACKEND_PORT=${BACKUP_SOURCE_BACKEND_PORT:-14200}
+SOURCE_FRONTEND_PORT=${BACKUP_SOURCE_FRONTEND_PORT:-18280}
+SOURCE_SIP_PORT=${BACKUP_SOURCE_SIP_PORT:-15260}
+SOURCE_AMI_PORT=${BACKUP_SOURCE_AMI_PORT:-15238}
+SOURCE_RTP_PORT_RANGE=${BACKUP_SOURCE_RTP_PORT_RANGE:-11400-11500}
+TARGET_BACKEND_PORT=${BACKUP_TARGET_BACKEND_PORT:-14300}
+TARGET_FRONTEND_PORT=${BACKUP_TARGET_FRONTEND_PORT:-18380}
+TARGET_SIP_PORT=${BACKUP_TARGET_SIP_PORT:-15360}
+TARGET_AMI_PORT=${BACKUP_TARGET_AMI_PORT:-15338}
+TARGET_RTP_PORT_RANGE=${BACKUP_TARGET_RTP_PORT_RANGE:-11600-11700}
+ROTATED_BACKEND_PORT=${BACKUP_ROTATED_BACKEND_PORT:-14400}
+ROTATED_FRONTEND_PORT=${BACKUP_ROTATED_FRONTEND_PORT:-18480}
+ROTATED_SIP_PORT=${BACKUP_ROTATED_SIP_PORT:-15460}
+ROTATED_AMI_PORT=${BACKUP_ROTATED_AMI_PORT:-15438}
+ROTATED_RTP_PORT_RANGE=${BACKUP_ROTATED_RTP_PORT_RANGE:-11800-11900}
 backup_dir=$(mktemp -d)
 completed=false
 
 source_compose() {
   COMPOSE_PROJECT_NAME="$SOURCE_PROJECT" \
-    PBX_BACKEND_PORT=14200 PBX_FRONTEND_PORT=18280 PBX_SIP_PORT=15260 PBX_AMI_PORT=15238 PBX_RTP_PORT_RANGE=11400-11500 \
+    PBX_BACKEND_PORT="$SOURCE_BACKEND_PORT" PBX_FRONTEND_PORT="$SOURCE_FRONTEND_PORT" PBX_SIP_PORT="$SOURCE_SIP_PORT" PBX_AMI_PORT="$SOURCE_AMI_PORT" PBX_RTP_PORT_RANGE="$SOURCE_RTP_PORT_RANGE" \
     docker compose -p "$SOURCE_PROJECT" -f "$REPOSITORY_ROOT/docker-compose.yml" -f "$REPOSITORY_ROOT/docker-compose.acceptance.yml" "$@"
 }
 
 target_compose() {
   COMPOSE_PROJECT_NAME="$TARGET_PROJECT" \
-    PBX_BACKEND_PORT=14300 PBX_FRONTEND_PORT=18380 PBX_SIP_PORT=15360 PBX_AMI_PORT=15338 PBX_RTP_PORT_RANGE=11600-11700 \
+    PBX_BACKEND_PORT="$TARGET_BACKEND_PORT" PBX_FRONTEND_PORT="$TARGET_FRONTEND_PORT" PBX_SIP_PORT="$TARGET_SIP_PORT" PBX_AMI_PORT="$TARGET_AMI_PORT" PBX_RTP_PORT_RANGE="$TARGET_RTP_PORT_RANGE" \
     docker compose -p "$TARGET_PROJECT" -f "$REPOSITORY_ROOT/docker-compose.yml" -f "$REPOSITORY_ROOT/docker-compose.acceptance.yml" "$@"
 }
 
 rotated_target_compose() {
   COMPOSE_PROJECT_NAME="$ROTATED_TARGET_PROJECT" \
-    PBX_BACKEND_PORT=14400 PBX_FRONTEND_PORT=18480 PBX_SIP_PORT=15460 PBX_AMI_PORT=15438 PBX_RTP_PORT_RANGE=11800-11900 \
+    PBX_BACKEND_PORT="$ROTATED_BACKEND_PORT" PBX_FRONTEND_PORT="$ROTATED_FRONTEND_PORT" PBX_SIP_PORT="$ROTATED_SIP_PORT" PBX_AMI_PORT="$ROTATED_AMI_PORT" PBX_RTP_PORT_RANGE="$ROTATED_RTP_PORT_RANGE" \
     docker compose -p "$ROTATED_TARGET_PROJECT" -f "$REPOSITORY_ROOT/docker-compose.yml" -f "$REPOSITORY_ROOT/docker-compose.acceptance.yml" "$@"
 }
 
@@ -74,7 +89,7 @@ test -n "$source_backend"
 docker cp "$source_backend:/data/acceptance-backup-a.tar.gz" "$backup_dir/acceptance-backup-a.tar.gz"
 
 manifest=$(tar -xOzf "$backup_dir/acceptance-backup-a.tar.gz" manifest.json)
-printf '%s\n' "$manifest" | grep -q '"product": "Essentials+ Calls"'
+printf '%s\n' "$manifest" | grep -q '"product": "Simple Calls"'
 printf '%s\n' "$manifest" | grep -q '"masterKeyIncluded": false'
 printf '%s\n' "$manifest" | grep -q '"sha256"'
 printf '%s\n' "$manifest" | grep -q '"secretKeyIds"'
@@ -160,4 +175,4 @@ PBX_MASTER_KEY="$KEY_C" rotated_target_compose --profile acceptance run --rm \
   acceptance
 
 completed=true
-printf 'Essentials+ Calls recovery passed: wrong keys failed closed, A and rotated C restored, sessions were invalidated, and post-restore WAV/RTP callflows passed.\n'
+printf 'Simple Calls recovery passed: wrong keys failed closed, A and rotated C restored, sessions were invalidated, and post-restore WAV/RTP callflows passed.\n'

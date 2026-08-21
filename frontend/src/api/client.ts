@@ -18,6 +18,22 @@ export interface AuthSession {
   expiresAt: string;
 }
 
+export interface SipClientEndpoint {
+  host: string;
+  port: number;
+  transport: 'udp';
+  scope: 'loopback-only' | 'configured-isolated';
+}
+
+export interface ServiceInfo {
+  name: string;
+  version: string;
+  apiVersion: string;
+  capabilityIds: string[];
+  authMode: 'local-session';
+  sipClientEndpoint: SipClientEndpoint;
+}
+
 export interface TopologyDocument {
   topology: Topology;
   revision: number;
@@ -63,6 +79,10 @@ export async function fetchSession(): Promise<AuthSession | null> {
   const session = await json<AuthSession>(response);
   csrfToken = session.csrfToken;
   return session;
+}
+
+export async function fetchService(): Promise<ServiceInfo> {
+  return json(await fetch('/api/service'));
 }
 
 export async function login(username: string, password: string): Promise<AuthSession> {

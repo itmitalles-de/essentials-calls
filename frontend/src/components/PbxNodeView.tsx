@@ -53,17 +53,16 @@ export function PbxNodeView({ data, selected }: { data: PbxNodeData; selected: b
   return (
     <div
       style={{
-        border: `2px solid ${selected ? 'var(--fg)' : invalid ? 'var(--danger)' : color}`,
-        borderRadius: 8,
+        border: `${selected ? 3 : 2}px solid ${selected ? 'var(--fg)' : invalid ? 'var(--danger)' : color}`,
+        borderRadius: 4,
         background: 'var(--bg-elevated)',
         minWidth: 170,
-        boxShadow: selected ? `0 0 0 3px var(--focus-ring)` : 'var(--shadow)',
       }}
     >
       <Handle type="target" position={Position.Left} style={{ background: color }} />
       {/* White header text is deliberate: it sits on the saturated node accent,
           which stays dark enough for contrast in both themes. */}
-      <div style={{ background: color, color: '#fff', padding: '4px 8px', borderRadius: '6px 6px 0 0', fontSize: 11, display: 'flex', justifyContent: 'space-between' }}>
+      <div style={{ background: color, color: '#fff', padding: '4px 8px', borderRadius: '2px 2px 0 0', fontSize: 11, display: 'flex', justifyContent: 'space-between' }}>
         <span>{NODE_TYPE_LABELS[pbxNode.type]}</span>
         {status && (
           <span
@@ -71,7 +70,7 @@ export function PbxNodeView({ data, selected }: { data: PbxNodeData; selected: b
             style={{
               width: 9,
               height: 9,
-              borderRadius: '50%',
+              borderRadius: 2,
               background: AVAILABILITY_COLORS[status.availability],
               alignSelf: 'center',
             }}

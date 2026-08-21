@@ -814,10 +814,10 @@ async function main() {
   invariant(AMI_SECRET, 'Synthetic AMI secret is missing.');
   await waitFor('backend health', async () => (await fetch(`${API.replace(/\/api$/, '')}/health`)).ok);
   const health = await fetch(`${API.replace(/\/api$/, '')}/health`).then((response) => response.json());
-  invariant(health.product === 'Essentials+ Calls', 'Visible product name is incorrect.');
+  invariant(health.product === 'Simple Calls', 'Visible product name is incorrect.');
   record('backend health and branding');
   const frontend = await fetch('http://frontend/');
-  invariant(frontend.ok && (await frontend.text()).includes('Essentials+ Calls'), 'Frontend health/branding failed.');
+  invariant(frontend.ok && (await frontend.text()).includes('Simple Calls'), 'Frontend health/branding failed.');
   record('frontend health and branding');
   await login();
   await ensureRoleFixtures();

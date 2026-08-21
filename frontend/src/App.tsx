@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BUILTIN_PROMPTS,
+  ExtensionNode,
   MAX_TOPOLOGY_IMPORT_BYTES,
   NodeStatus,
   Topology,
@@ -12,6 +13,7 @@ import {
   AuthSession,
   RevisionInfo,
   Role,
+  ServiceInfo,
   SoundInfo,
   StatusConnection,
   UserInfo,
@@ -22,6 +24,7 @@ import {
   dryRunImport,
   exportTopology,
   fetchRevisions,
+  fetchService,
   fetchSession,
   fetchSounds,
   fetchTopology,
@@ -35,18 +38,32 @@ import {
 } from './api/client';
 import { SimpleView } from './views/SimpleView';
 import { AdvancedView } from './views/AdvancedView';
-import { THEME_ICONS, THEME_LABELS, useTheme } from './theme';
+import { SoftphonesView } from './views/SoftphonesView';
+import { AppSection, SimpleAppShell } from './components/SimpleAppShell';
+import { ThemeSelector } from './components/ThemeSelector';
+import { useTheme } from './theme';
 import { useBoundedHistory } from './history';
+import {
+  CheckCircle2,
+  FileDown,
+  FileUp,
+  Redo2,
+  Rocket,
+  Save,
+  ShieldAlert,
+  Undo2,
+} from 'lucide-react';
 
-type Tab = 'simple' | 'advanced' | 'revisions' | 'users';
+type Tab = 'simple' | 'advanced' | 'revisions' | 'softphones' | 'users';
 type Operation = { kind: 'idle' | 'busy' | 'ok' | 'error'; message?: string };
+type ThemeController = ReturnType<typeof useTheme>;
 
 function message(error: unknown): string {
   if (error instanceof ApiError && error.status === 409) return `Versionskonflikt: ${error.message}`;
   return error instanceof Error ? error.message : 'Unbekannter Fehler.';
 }
 
-function Login({ onLogin }: { onLogin: (session: AuthSession) => void }) {
+function Login({ onLogin, theme }: { onLogin: (session: AuthSession) => void; theme: ThemeController }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -64,30 +81,56 @@ function Login({ onLogin }: { onLogin: (session: AuthSession) => void }) {
     }
   };
   return (
-    <main className="login-shell">
-      <form className="login-card" onSubmit={submit} aria-label="Anmeldung">
-        <h1>Essentials+ Calls</h1>
-        <p>Sichere lokale Administration</p>
-        <p className="poc-status" role="note">
-          Technischer PoC · synthetisch getestet · keine produktive PBX, keine realen Trunks, DIDs oder Notrufe
+    <main className="sb-root login-shell" data-sb-theme={theme.resolved} data-sb-concept="3">
+      <section className="login-brand" aria-labelledby="login-product-title">
+        <div className="login-product-identity">
+          <span className="sb-product-symbol" aria-hidden="true">C</span>
+          <span className="sb-product-copy">
+            <span className="sb-wordmark">simple</span>
+            <span className="sb-product-name">Calls</span>
+          </span>
+        </div>
+        <div>
+          <p className="sb-eyebrow">Simple Business</p>
+          <h1 className="sb-title" id="login-product-title">Simple Calls</h1>
+          <p className="sb-subtitle">Callflows lokal entwerfen, simulieren und gegen eine isolierte Asterisk-Runtime prüfen.</p>
+        </div>
+        <p className="login-boundary" role="note">
+          <ShieldAlert className="sb-icon" aria-hidden="true" />
+          <span>Technischer PoC · synthetisch getestet · keine produktive PBX, keine realen Trunks, DIDs oder Notrufe</span>
         </p>
-        <label>
-          Benutzername
-          <input name="username" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} />
-        </label>
-        <label>
-          Passwort
-          <input
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </label>
-        <button type="submit" disabled={busy}>{busy ? 'Anmeldung läuft…' : 'Anmelden'}</button>
-        {error && <div role="alert" className="error-text">{error}</div>}
-      </form>
+      </section>
+
+      <section className="login-form-region">
+        <form className="login-card" onSubmit={submit} aria-label="Anmeldung">
+          <div>
+            <p className="sb-eyebrow">Lokale Administration</p>
+            <h2>Anmelden</h2>
+            <p className="login-helper">Verwende einen lokal angelegten Simple-Calls-Benutzer.</p>
+          </div>
+          <label>
+            Benutzername
+            <input className="sb-field" name="username" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} />
+          </label>
+          <label>
+            Passwort
+            <input
+              className="sb-field"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+          <button className="sb-button sb-button-primary" type="submit" disabled={busy}>{busy ? 'Anmeldung läuft…' : 'Anmelden'}</button>
+          {error && <div role="alert" className="error-text">{error}</div>}
+        </form>
+        <div className="login-theme">
+          <span>Darstellung</span>
+          <ThemeSelector preference={theme.preference} onChange={theme.setPreference} label="Darstellung auf der Anmeldeseite" />
+        </div>
+      </section>
     </main>
   );
 }
@@ -107,6 +150,7 @@ export default function App() {
   const [sounds, setSounds] = useState<SoundInfo[]>([]);
   const [revisions, setRevisions] = useState<RevisionInfo[]>([]);
   const [users, setUsers] = useState<UserInfo[]>([]);
+  const [service, setService] = useState<ServiceInfo | null>(null);
   const [importCandidate, setImportCandidate] = useState<unknown>();
   const [importPreview, setImportPreview] = useState<string>('');
   const importInput = useRef<HTMLInputElement>(null);
@@ -120,13 +164,19 @@ export default function App() {
   }, []);
 
   const loadWorkspace = async (resetHistory = true) => {
-    const [document, soundResult, revisionResult] = await Promise.all([fetchTopology(), fetchSounds(), fetchRevisions()]);
+    const [document, soundResult, revisionResult, serviceResult] = await Promise.all([
+      fetchTopology(),
+      fetchSounds(),
+      fetchRevisions(),
+      fetchService(),
+    ]);
     if (resetHistory) history.reset(document.topology);
     else history.acceptSaved(document.topology);
     setRevision(document.revision);
     setActiveRevision(document.activeRevision);
     setSounds(soundResult.sounds);
     setRevisions(revisionResult.revisions);
+    setService(serviceResult);
     setSelection({});
   };
 
@@ -277,7 +327,7 @@ export default function App() {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `essentials-calls-topology-r${revision}.json`;
+      anchor.download = `simple-calls-topology-r${revision}.json`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (error) {
@@ -305,102 +355,139 @@ export default function App() {
     await refreshRevisions();
   };
 
-  if (session === undefined) return <div style={{ padding: 24 }}>Authentisierung wird geprüft…</div>;
-  if (!session) return <Login onLogin={setSession} />;
+  if (session === undefined) return <div className="sb-root loading-screen" data-sb-theme={theme.resolved}>Authentisierung wird geprüft…</div>;
+  if (!session) return <Login onLogin={setSession} theme={theme} />;
   if (loadError) {
-    return <div style={{ padding: 24 }} role="alert">Topologie konnte nicht geladen werden: {loadError}</div>;
+    return <div className="sb-root loading-screen error-text" data-sb-theme={theme.resolved} role="alert">Topologie konnte nicht geladen werden: {loadError}</div>;
   }
-  if (!topology) return <div style={{ padding: 24 }}>Arbeitsbereich wird geladen…</div>;
+  if (!topology || !service) return <div className="sb-root loading-screen" data-sb-theme={theme.resolved}>Arbeitsbereich wird geladen…</div>;
+
+  const section: AppSection = tab === 'simple' || tab === 'advanced' ? 'callflow' : tab;
+  const extensions = topology.nodes.filter((node): node is ExtensionNode => node.type === 'extension');
+  const chooseSection = (next: AppSection) => {
+    if (next === 'callflow') setTab('simple');
+    else setTab(next);
+  };
+  const openExtension = (nodeId: string) => {
+    setTab('simple');
+    setSelection(nodeId ? { nodeId } : {});
+  };
 
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <strong>Essentials+ Calls</strong>
-        <nav aria-label="Ansichten">
-          <button onClick={() => setTab('simple')} disabled={tab === 'simple'}>Graph</button>
-          <button onClick={() => setTab('advanced')} disabled={tab === 'advanced'}>Tabelle</button>
-          <button onClick={() => setTab('revisions')} disabled={tab === 'revisions'}>Revisionen</button>
-          {isAdmin && <button onClick={() => setTab('users')} disabled={tab === 'users'}>Benutzer</button>}
-        </nav>
-        <span className="revision-badge">Entwurf r{revision} · aktiv {activeRevision ? `r${activeRevision}` : '—'}{history.dirty ? ' · ungespeichert' : ''}</span>
-        <span className={`connection-state ${connection.state}`} title={`Reconnect-Versuch ${connection.reconnectAttempt}`}>
-          AMI: {connection.state}
-        </span>
-        <span style={{ color: hasErrors ? 'var(--danger)' : 'var(--success)' }}>
-          {hasErrors ? `${issues.filter((issue) => issue.severity === 'error').length} Fehler` : 'gültig'}
-        </span>
-        <button onClick={history.undo} disabled={!canEdit || !history.canUndo} aria-label="Rückgängig">↶ Undo</button>
-        <button onClick={history.redo} disabled={!canEdit || !history.canRedo} aria-label="Wiederholen">↷ Redo</button>
-        <button onClick={theme.cycle} aria-label={`Design umschalten, aktuell ${THEME_LABELS[theme.preference]}`}>
-          {THEME_ICONS[theme.preference]} {THEME_LABELS[theme.preference]}
-        </button>
-        {canEdit && <button onClick={handleSave} disabled={hasErrors || operation.kind === 'busy'}>Speichern</button>}
-        {isAdmin && <button onClick={handleDeploy} disabled={hasErrors || operation.kind === 'busy'}>Deploy</button>}
-        <button onClick={async () => { await logout(); setSession(null); }}>Abmelden</button>
-      </header>
+    <SimpleAppShell
+      section={section}
+      onSectionChange={chooseSection}
+      username={session.user.username}
+      role={session.user.role}
+      isAdmin={!!isAdmin}
+      theme={theme}
+      onLogout={async () => { await logout(); setSession(null); }}
+    >
+      {section !== 'callflow' && operation.kind !== 'idle' && (
+        <div className="operation-bar management-operation-bar">
+          <span role={operation.kind === 'error' ? 'alert' : 'status'} className={operation.kind === 'error' ? 'error-text' : ''}>{operation.message}</span>
+        </div>
+      )}
 
-      <div className="toolbar-secondary">
-        <span>Angemeldet als {session.user.username} ({session.user.role})</span>
-        <button onClick={downloadExport}>Redigierter Export</button>
-        {isAdmin && <button onClick={() => importInput.current?.click()}>Import prüfen</button>}
-        <input aria-label="Topologie importieren" ref={importInput} type="file" accept="application/json,.json" hidden onChange={(event) => chooseImport(event.target.files?.[0])} />
-        {importPreview && <span role="status">{importPreview}</span>}
-        {isAdmin && importCandidate !== undefined && <button onClick={applyCandidate}>Geprüften Import anwenden</button>}
-        {operation.kind !== 'idle' && <span role={operation.kind === 'error' ? 'alert' : 'status'} className={operation.kind === 'error' ? 'error-text' : ''}>{operation.message}</span>}
-      </div>
+      {section === 'callflow' && (
+        <div className="callflow-workspace">
+          <header className="callflow-header">
+            <div>
+              <p className="sb-eyebrow">Callflow-Editor</p>
+              <h1 className="callflow-title">{topology.name}</h1>
+              <div className="callflow-meta">
+                <span className="revision-badge">Entwurf r{revision} · aktiv {activeRevision ? `r${activeRevision}` : '—'}{history.dirty ? ' · ungespeichert' : ''}</span>
+                <span className={`connection-state ${connection.state}`} title={`Reconnect-Versuch ${connection.reconnectAttempt}`}>AMI: {connection.state}</span>
+                <span className={`validation-state ${hasErrors ? 'invalid' : 'valid'}`}>
+                  {hasErrors ? <ShieldAlert className="sb-icon" aria-hidden="true" /> : <CheckCircle2 className="sb-icon" aria-hidden="true" />}
+                  {hasErrors ? `${issues.filter((issue) => issue.severity === 'error').length} Fehler` : 'gültig'}
+                </span>
+              </div>
+            </div>
+            <div className="callflow-primary-actions">
+              {canEdit && <button className="sb-button" onClick={handleSave} disabled={hasErrors || operation.kind === 'busy'}><Save className="sb-icon" aria-hidden="true" />Speichern</button>}
+              {isAdmin && <button className="sb-button sb-button-primary" onClick={handleDeploy} disabled={hasErrors || operation.kind === 'busy'}><Rocket className="sb-icon" aria-hidden="true" />Deploy</button>}
+            </div>
+          </header>
 
-      <div className="poc-status poc-status-banner" role="note">
-        Technischer PoC · synthetisch getestet · keine produktive PBX, keine realen Trunks, DIDs, Notrufe oder Carrier-/NAT-Audio-Abnahme · Rechte und Revenue offen
-      </div>
+          <div className="callflow-toolbar">
+            <div className="sb-tabs" role="tablist" aria-label="Editoransicht">
+              <button className="sb-tab" type="button" role="tab" aria-selected={tab === 'simple'} onClick={() => setTab('simple')}>Graph</button>
+              <button className="sb-tab" type="button" role="tab" aria-selected={tab === 'advanced'} onClick={() => setTab('advanced')}>Tabelle</button>
+            </div>
+            <div className="editor-actions">
+              <button className="sb-button compact-button" type="button" onClick={history.undo} disabled={!canEdit || !history.canUndo} aria-label="Rückgängig"><Undo2 className="sb-icon" aria-hidden="true" /><span>Undo</span></button>
+              <button className="sb-button compact-button" type="button" onClick={history.redo} disabled={!canEdit || !history.canRedo} aria-label="Wiederholen"><Redo2 className="sb-icon" aria-hidden="true" /><span>Redo</span></button>
+              <button className="sb-button compact-button" type="button" onClick={downloadExport}><FileDown className="sb-icon" aria-hidden="true" /><span>Redigierter Export</span></button>
+              {isAdmin && <button className="sb-button compact-button" type="button" onClick={() => importInput.current?.click()}><FileUp className="sb-icon" aria-hidden="true" /><span>Import prüfen</span></button>}
+              <input aria-label="Topologie importieren" ref={importInput} type="file" accept="application/json,.json" hidden onChange={(event) => chooseImport(event.target.files?.[0])} />
+              {isAdmin && importCandidate !== undefined && <button className="sb-button" type="button" onClick={applyCandidate}>Geprüften Import anwenden</button>}
+            </div>
+          </div>
 
-      <main className="app-main">
-        {tab === 'simple' && (
-          <SimpleView
-            topology={topology}
-            setTopology={history.update}
-            statuses={statuses}
-            issues={issues}
-            selectedNodeId={selection.nodeId}
-            selectedEdgeId={selection.edgeId}
-            onSelect={setSelection}
-            canEdit={!!canEdit}
-            canManageSecrets={!!isAdmin}
-            revision={revision}
-            onSecretChange={changeSecret}
-            onServerTopologyChanged={() => loadWorkspace(true)}
-          />
-        )}
-        {tab === 'advanced' && <AdvancedView topology={topology} setTopology={history.update} issues={issues} readOnly={!canEdit} />}
-        {tab === 'revisions' && (
+          {(importPreview || operation.kind !== 'idle') && (
+            <div className="operation-bar">
+              {importPreview && <span role="status">{importPreview}</span>}
+              {operation.kind !== 'idle' && <span role={operation.kind === 'error' ? 'alert' : 'status'} className={operation.kind === 'error' ? 'error-text' : ''}>{operation.message}</span>}
+            </div>
+          )}
+
+          <div className="poc-status-banner" role="note">
+            Technischer PoC · synthetisch getestet · keine produktive PBX, keine realen Trunks, DIDs, Notrufe oder Carrier-/NAT-Audio-Abnahme · Rechte und Revenue offen
+          </div>
+
+          <div className="callflow-editor">
+            {tab === 'simple' && (
+              <SimpleView
+                topology={topology}
+                setTopology={history.update}
+                statuses={statuses}
+                issues={issues}
+                selectedNodeId={selection.nodeId}
+                selectedEdgeId={selection.edgeId}
+                onSelect={setSelection}
+                canEdit={!!canEdit}
+                canManageSecrets={!!isAdmin}
+                revision={revision}
+                onSecretChange={changeSecret}
+                onServerTopologyChanged={() => loadWorkspace(true)}
+              />
+            )}
+            {tab === 'advanced' && <AdvancedView topology={topology} setTopology={history.update} issues={issues} readOnly={!canEdit} />}
+          </div>
+        </div>
+      )}
+
+      {section === 'revisions' && (
+        <div className="sb-page management-page">
+          <header className="sb-page-header">
+            <div><p className="sb-eyebrow">Nachvollziehbarkeit</p><h1 className="sb-title">Revisionen</h1><p className="sb-subtitle">Unveränderliche Topologie-Stände; Rollback erzeugt immer eine neue Revision.</p></div>
+          </header>
           <section className="revision-panel" aria-label="Versionshistorie">
-            <h2>Unveränderliche Topologie-Revisionen</h2>
-            <table>
+            <div className="table-scroll"><table>
               <thead><tr><th>Revision</th><th>Zeit</th><th>Akteur</th><th>Kommentar</th><th>Änderung</th><th /></tr></thead>
-              <tbody>
-                {revisions.map((entry) => (
-                  <tr key={entry.revision}>
-                    <td>r{entry.revision}{entry.active ? ' (aktiv)' : ''}</td>
-                    <td>{new Date(entry.createdAt).toLocaleString()}</td>
-                    <td>{entry.actor}</td>
-                    <td>{entry.comment}</td>
-                    <td>{entry.summary}</td>
-                    <td>{isAdmin && entry.revision !== revision && <button onClick={() => doRollback(entry.revision)}>Auf r{entry.revision} zurückrollen</button>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              <tbody>{revisions.map((entry) => (
+                <tr key={entry.revision}>
+                  <td>r{entry.revision}{entry.active ? ' (aktiv)' : ''}</td><td>{new Date(entry.createdAt).toLocaleString()}</td><td>{entry.actor}</td><td>{entry.comment}</td><td>{entry.summary}</td>
+                  <td>{isAdmin && entry.revision !== revision && <button className="sb-button" onClick={() => doRollback(entry.revision)}>Auf r{entry.revision} zurückrollen</button>}</td>
+                </tr>
+              ))}</tbody>
+            </table></div>
           </section>
-        )}
-        {tab === 'users' && isAdmin && (
-          <UsersPanel
-            users={users}
-            currentUserId={session.user.id}
-            onRefresh={refreshUsers}
-            onError={(error) => setOperation({ kind: 'error', message: message(error) })}
-          />
-        )}
-      </main>
-    </div>
+        </div>
+      )}
+
+      {section === 'softphones' && (
+        <SoftphonesView extensions={extensions} endpoint={service.sipClientEndpoint} onOpenExtension={openExtension} />
+      )}
+
+      {section === 'users' && isAdmin && (
+        <div className="sb-page management-page">
+          <header className="sb-page-header"><div><p className="sb-eyebrow">Lokale Administration</p><h1 className="sb-title">Benutzer</h1><p className="sb-subtitle">Rollen und lokale Sitzungszugänge für diese einzelne Installation verwalten.</p></div></header>
+          <UsersPanel users={users} currentUserId={session.user.id} onRefresh={refreshUsers} onError={(error) => setOperation({ kind: 'error', message: message(error) })} />
+        </div>
+      )}
+    </SimpleAppShell>
   );
 }
 

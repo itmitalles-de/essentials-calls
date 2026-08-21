@@ -201,43 +201,45 @@ export function SimpleView({
     });
 
   return (
-    <div aria-label="Callflow-Graph" style={{ display: 'flex', height: '100%' }}>
-      <div style={{ flex: 1, position: 'relative' }}>
-        <div style={{ position: 'absolute', zIndex: 10, top: 8, left: 8, display: 'flex', gap: 6 }}>
+    <div className="simple-editor-layout" aria-label="Callflow-Graph">
+      <div className="flow-canvas">
+        <div className="flow-palette" aria-label="Knotentypen">
           {PALETTE.map((p) => (
             <button key={p.type} onClick={() => addNode(p.type)} disabled={!canEdit}>
               {p.label}
             </button>
           ))}
         </div>
-        <ReactFlow
-          nodes={rfNodes}
-          edges={rfEdges}
-          nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={(_, n) => onSelect({ nodeId: n.id })}
-          onEdgeClick={(_, e) => onSelect({ edgeId: e.id })}
-          onPaneClick={() => onSelect({})}
-          nodesDraggable={canEdit}
-          nodesConnectable={canEdit}
-          nodesFocusable
-          edgesFocusable
-          deleteKeyCode={canEdit ? ['Backspace', 'Delete'] : null}
-          fitView
-        >
-          {/* These take colours as props, not CSS, so they are read from the
-              resolved theme tokens rather than styled in the stylesheet. */}
-          <Background color="var(--grid-dot)" />
-          <Controls />
-          <MiniMap
-            nodeColor={(n) => NODE_MINIMAP_COLORS[(n.data as PbxNodeData)?.pbxNode?.type] ?? 'var(--fg-muted)'}
-            maskColor="transparent"
-          />
-        </ReactFlow>
+        <div className="flow-surface">
+          <ReactFlow
+            nodes={rfNodes}
+            edges={rfEdges}
+            nodeTypes={nodeTypes}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={(_, n) => onSelect({ nodeId: n.id })}
+            onEdgeClick={(_, e) => onSelect({ edgeId: e.id })}
+            onPaneClick={() => onSelect({})}
+            nodesDraggable={canEdit}
+            nodesConnectable={canEdit}
+            nodesFocusable
+            edgesFocusable
+            deleteKeyCode={canEdit ? ['Backspace', 'Delete'] : null}
+            fitView
+          >
+            {/* These take colours as props, not CSS, so they are read from the
+                resolved theme tokens rather than styled in the stylesheet. */}
+            <Background color="var(--grid-dot)" />
+            <Controls />
+            <MiniMap
+              nodeColor={(n) => NODE_MINIMAP_COLORS[(n.data as PbxNodeData)?.pbxNode?.type] ?? 'var(--fg-muted)'}
+              maskColor="transparent"
+            />
+          </ReactFlow>
+        </div>
       </div>
-      <div style={{ width: 280, borderLeft: '1px solid var(--border)', overflowY: 'auto' }}>
+      <div className="flow-inspector">
         <Inspector
           topology={topology}
           selectedNodeId={selectedNodeId}
