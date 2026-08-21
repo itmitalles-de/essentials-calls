@@ -9,7 +9,9 @@
   ],
   "scripts": {
     "build:shared": "npm run build -w shared",
+    "prebuild": "npm run lint:design",
     "build": "npm run build -w shared && npm run build -w backend && npm run build -w frontend",
+    "lint:design": "simple-business-lint --rules icons frontend/src",
     "typecheck": "npm run build:shared && npm run typecheck -w backend && npm run typecheck -w frontend",
     "test": "npm run build:shared && npm run test -w shared && npm run test -w backend",
     "test:full-stack": "sh scripts/full-stack-acceptance.sh",
@@ -19,6 +21,7 @@
     "dev:frontend": "npm run dev -w frontend"
   },
   "devDependencies": {
+    "@itmitalles-de/simple-business-design-system": "https://github.com/itmitalles-de/simple-business-design-system/releases/download/v0.1.1/itmitalles-de-simple-business-design-system-0.1.1.tgz",
     "@playwright/test": "^1.62.1"
   }
 }

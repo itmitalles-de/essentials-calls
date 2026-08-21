@@ -87,6 +87,9 @@ recorded in `.agent/TODO.md`.
 ## Simple Business design-system contract
 
 - `.simple-business-design-system.json` pins the central UI source to commit
-  `e508cc2` and package version `0.1.0`; no rules are copied into this product.
-- Existing UI remains legacy. Package/CI activation waits for the central
-  GitHub Actions billing blocker to be resolved and is not claimed as complete.
+  `8bbee92` and package version `0.1.1`; no rules are copied into this product.
+- The root workspace consumes the exact public release artifact, the web
+  frontend loads its token stylesheet before local styles, and the root build
+  runs the shared icon-semantics check.
+- Existing UI remains legacy; package activation is not a claim that the full
+  visual migration is complete.
