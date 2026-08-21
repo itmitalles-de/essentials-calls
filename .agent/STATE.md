@@ -8,7 +8,7 @@
   `master`.
 - Current branch: `agent/simple-calls-ui-softphones`; stabilization baseline:
   `219361ce5a2b4d1f128ce02948bdfc648a696283`; locally verified implementation:
-  `9f5b32ead2956e1944544e3630f5dc698581e6ba`.
+  `893708974be427f1d2ab38d297684e1265398762`.
 - Historical npm, data, volume, browser-storage, AMI/test, Compose, Asterisk
   path, and `master` identifiers remain documented compatibility boundaries.
 - Exact Asterisk 22.10.1, bundled PJProject 2.17, and Jansson 2.15.0 are built
@@ -51,7 +51,7 @@
   persistence passed in a fresh isolated project. An unrelated occupied port
   was preserved and the successful rerun used a separate port range.
 - Browser: Playwright 1.62.1 with Chrome for Testing 151.0.7922.34 ran all
-  eight tests in 39.4 seconds: 8/8 passed, zero skips/TODOs, no unexpected
+  eight tests in 39.1 seconds: 8/8 passed, zero skips/TODOs, no unexpected
   console/page errors, failed requests, unallowlisted HTTP failures, or
   unhandled browser promise rejections.
 - Backup/recovery used fresh source/A/C projects and volumes. Both wrong/obsolete

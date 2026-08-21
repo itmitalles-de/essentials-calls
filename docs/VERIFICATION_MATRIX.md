@@ -1,7 +1,7 @@
 # Verification matrix
 
 Snapshot: 2026-08-22 on branch `agent/simple-calls-ui-softphones`, verified
-implementation commit `9f5b32ead2956e1944544e3630f5dc698581e6ba`
+implementation commit `893708974be427f1d2ab38d297684e1265398762`
 (stabilization baseline `219361ce5a2b4d1f128ce02948bdfc648a696283`).
 “Passed” applies only to the named evidence class and never promotes a result
 to a real-carrier, DID, telephone-network, or production claim.
@@ -46,7 +46,7 @@ to a real-carrier, DID, telephone-network, or production claim.
   used its own Compose project, volumes, and host-port range; an earlier start
   detected and preserved an unrelated process already using port 18080.
 - Browser: Playwright 1.62.1 with Chrome for Testing 151.0.7922.34 ran all
-  eight tests in 39.4 seconds: 8/8 passed, zero skips/TODOs, no unexpected
+  eight tests in 39.1 seconds: 8/8 passed, zero skips/TODOs, no unexpected
   console/page
   errors, unallowlisted HTTP errors, failed requests, or unhandled browser
   promise rejection.
