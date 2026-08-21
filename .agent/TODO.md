@@ -5,10 +5,10 @@
 - [ ] Keep stabilization PR #3 in draft until a human reviews the complete diff.
   All hosted CI jobs are green at `219361ce`; this is still not production
   approval and the PR must not be merged automatically.
-- [ ] Open and review the separate stacked draft PR from
-  `agent/simple-calls-ui-softphones` to `stabilize/calls-verified-poc`, then
-  close draft PR #24 as superseded. Do not repurpose #24 or target `master`
-  before the stabilization dependency is resolved.
+- [ ] Keep stacked draft PR #25 against `stabilize/calls-verified-poc` in draft
+  until its final hosted CI head is green and a human reviews it. PR #24 is
+  closed as superseded; do not retarget #25 to `master` before the stabilization
+  dependency is resolved.
 - [ ] Before 2026-09-20, refresh the Debian snapshots or otherwise remediate
   the 15 explicitly recorded unfixed CVE IDs, rerun all image/runtime suites,
   and remove or narrowly renew the exception with human security review.

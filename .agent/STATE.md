@@ -68,9 +68,11 @@
 
 - Draft PR #3 (`stabilize/calls-verified-poc` -> `master`) is open and all five
   CI jobs plus the Dependabot configuration check are green at `219361ce`.
-- Draft PR #24 contains only the earlier design-system activation attempt; four
-  jobs pass and browser E2E fails. The current branch supersedes it and must be
-  proposed as a separate stacked draft PR, not by repurposing #24.
+- Stacked draft PR #25 (`agent/simple-calls-ui-softphones` ->
+  `stabilize/calls-verified-poc`) contains the current UI/softphone integration;
+  hosted CI is required on its final head before review.
+- Earlier design-system draft PR #24 was closed without merge as superseded by
+  #25; it was not repurposed.
 - Historical rebranding PR #2 is closed without merge and superseded by the
   repository rename and later work.
 
