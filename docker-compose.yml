@@ -23,6 +23,10 @@ services:
       PBX_MASTER_KEY: ${PBX_MASTER_KEY:?Set PBX_MASTER_KEY to a synthetic 32-byte Base64 value}
       PBX_ENV: ${PBX_ENV:-development}
       PBX_SECURE_COOKIES: ${PBX_SECURE_COOKIES:-false}
+      # Safe, non-secret endpoint metadata shown on the local softphone guide.
+      # This does not expose or enable a trunk and follows the loopback mapping.
+      PBX_CLIENT_SIP_HOST: ${PBX_CLIENT_SIP_HOST:-127.0.0.1}
+      PBX_CLIENT_SIP_PORT: ${PBX_SIP_PORT:-5060}
     volumes:
       - pbx-data:/data
       - asterisk-generated:/shared-config

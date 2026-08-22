@@ -90,7 +90,7 @@ afterEach(async () => {
 });
 
 describe('authentication and authorization API', () => {
-  test('publishes an unauthenticated, topology-free Office service contract', async () => {
+  test('publishes an unauthenticated, topology-free Simple Business service contract', async () => {
     for (const route of ['/health', '/ready', '/api/service']) {
       const response = await client().request(route);
       assert.equal(response.status, 200);
@@ -98,7 +98,8 @@ describe('authentication and authorization API', () => {
       const body = JSON.parse(raw) as {
         name: string; version: string; apiVersion: string; capabilityIds: string[]; authMode: string;
       };
-      assert.equal(body.name, 'Essentials+ Calls');
+      assert.equal(body.name, 'Simple Calls');
+      assert.ok(body.capabilityIds.includes('calls.softphones.guidance'));
       assert.match(body.version, /^\d+\.\d+\.\d+$/);
       assert.equal(body.apiVersion, 'v1');
       assert.equal(body.authMode, 'local-session');

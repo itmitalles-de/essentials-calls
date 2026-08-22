@@ -11,7 +11,7 @@
       CSeq: 1 INVITE
       Contact: <sip:[service]@[local_ip]:[local_port];transport=[transport]>
       Max-Forwards: 70
-      Subject: Essentials+ Calls synthetic acceptance
+      Subject: Simple Calls synthetic acceptance
       Content-Type: application/sdp
       Content-Length: [len]
 
@@ -55,7 +55,7 @@
       Contact: <sip:[service]@[local_ip]:[local_port];transport=[transport]>
       [authentication]
       Max-Forwards: 70
-      Subject: Essentials+ Calls synthetic acceptance
+      Subject: Simple Calls synthetic acceptance
       Content-Type: application/sdp
       Content-Length: [len]
 

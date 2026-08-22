@@ -54,4 +54,4 @@ printf '%s\n' "$E2E_ADMIN_PASSWORD" \
   | compose exec -T backend node backend/dist/cli/bootstrapAdmin.js --username "$E2E_ADMIN_USERNAME" --password-stdin
 npx playwright test
 completed=true
-printf 'Essentials+ Calls browser E2E passed with semantic assertions.\n'
+printf 'Simple Calls browser E2E passed with semantic assertions.\n'

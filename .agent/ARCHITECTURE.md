@@ -28,9 +28,12 @@ React/nginx -> authenticated REST + WebSocket -> Express
 
 ## Invariants
 
-- Product and canonical repository are Essentials+ Calls and
-  `itmitalles-de/essentials-calls`; historical npm/data/runtime names remain
+- Product and canonical repository are Simple Calls and
+  `itmitalles-de/simple-calls`; historical npm/data/runtime names remain
   only as documented compatibility identifiers.
+- The frontend consumes the immutable Simple Business v0.1.1 design-system
+  artifact pinned in the manifest. It owns its shell integration and exposes
+  only allowlisted download guidance plus non-secret SIP endpoint metadata.
 - SQLite revisions and encrypted secret rows are authoritative. Generated files
   are immutable derived versions.
 - API topology, revisions, audit, and normal exports contain no plaintext SIP

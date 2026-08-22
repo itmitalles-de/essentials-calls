@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://itmitalles.de/schemas/essentials-calls/topology-v2.schema.json",
-  "title": "Essentials+ Calls topology export v2",
+  "$id": "https://itmitalles.de/schemas/simple-calls/topology-v2.schema.json",
+  "title": "Simple Calls topology export v2",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "product", "exportedAt", "redacted", "topology"],
   "properties": {
     "schemaVersion": { "const": 2 },
-    "product": { "const": "Essentials+ Calls" },
+    "product": { "enum": ["Simple Calls", "Essentials+ Calls"] },
     "exportedAt": { "type": "string", "format": "date-time" },
     "redacted": { "const": true },
     "topology": { "$ref": "#/$defs/topology" }

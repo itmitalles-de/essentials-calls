@@ -2,14 +2,38 @@
 
 ## Repository rename with compatibility boundaries
 
-**Decision:** The canonical repository is `itmitalles-de/essentials-calls` and
-the product is Essentials+ Calls. Historical npm/package, persistent path,
+**Decision:** The canonical repository is `itmitalles-de/simple-calls` and
+the product is Simple Calls. Historical npm/package, persistent path,
 volume, browser-storage, AMI/test, and Asterisk identifiers remain compatible;
-the default branch stays `master`.
+the default branch stays `master`. Readers accept legacy `Essentials+ Calls`
+archive/topology markers, while new output uses `Simple Calls`.
 
 **Reason:** Public identity must match the repository rename without risking an
 unrelated workspace/data migration or orphaning installed state. The exact
 boundary is documented in `docs/COMPATIBILITY_IDENTIFIERS.md`.
+
+## Simple Business UI is consumed as a pinned contract
+
+**Decision:** Consume the Simple Business design system from the exact v0.1.1
+release artifact and source commit recorded in
+`.simple-business-design-system.json`. Use its tokens, icon semantics, and
+architecture lint while keeping the Simple Calls shell and domain UI in this
+repository.
+
+**Reason:** A versioned upstream contract keeps the suite visually coherent
+without copying a second design system or depending on a mutable branch/CDN.
+
+## Softphone onboarding is secret-free guidance
+
+**Decision:** The authenticated devices page may show only a selected extension
+number and sanitized host/port/transport metadata. Downloads are an explicit
+HTTPS allowlist of official Linphone, MicroSIP, and Zoiper landing pages. Do not
+mirror binaries, construct credential URLs/QR codes, return passwords, or add a
+WebRTC phone.
+
+**Reason:** Users need a safe route to client software, but distribution,
+credential provisioning, real endpoint/NAT acceptance, and an in-browser phone
+are distinct security and product scopes.
 
 ## Save is not an undo boundary
 
@@ -44,7 +68,7 @@ must be handled as sensitive. Generated Asterisk files remain derivatives.
 sessions, CSRF, and viewer/editor/admin authorization on every API route.
 
 **Reason:** This is the smallest self-contained single-tenant trust boundary.
-OIDC/Office SSO is explicitly deferred.
+OIDC/Simple Business SSO is explicitly deferred.
 
 ## AEAD source secrets and Asterisk 22 digest derivatives
 

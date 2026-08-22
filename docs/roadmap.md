@@ -1,6 +1,6 @@
 # Status, roadmap, and blockers
 
-Status: 2026-08-20. Essentials+ Calls is a single-tenant callflow editor,
+Status: 2026-08-22. Simple Calls is a single-tenant callflow editor,
 simulator, and isolated synthetic Asterisk 22 LTS runtime: a technical
 proof of concept, not a production PBX or telephone service.
 
@@ -21,6 +21,9 @@ proof of concept, not a production PBX or telephone service.
   state separated from configuration.
 - Disposable SIPp/Asterisk, Chromium, and A/B/C backup/recovery acceptance with
   synthetic identities, credentials, prompts, calls, WAV, and RTP only.
+- Version-pinned Simple Business v0.1.1 navigation and tokens, responsive
+  system/light/dark UI, and secret-free softphone setup guidance that links
+  only to approved official vendor pages.
 - Digest/SHA-pinned actions, bases, source archives and SBOM inputs; exact apt
   versions from named Ubuntu/Debian snapshots; minimized Node runtimes; and a
   local-image CVE gate whose only exception is package-scoped and expires on

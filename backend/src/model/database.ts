@@ -69,7 +69,7 @@ export class UserSafetyError extends Error {}
 const SEED_TOPOLOGY: Topology = {
   id: 'topo-1',
   name: 'Kleine Büroanlage',
-  description: 'Synthetische Beispiel-Topologie für Essentials+ Calls',
+  description: 'Synthetische Beispiel-Topologie für Simple Calls',
   nodes: [
     {
       id: 'ext-101',

@@ -1,8 +1,8 @@
-# Essentials+ Calls
+# Simple Calls
 
-Essentials+ Calls is a visual callflow editor, simulator, and isolated
+Simple Calls is a visual callflow editor, simulator, and isolated
 synthetic Asterisk 22 LTS runtime. Its canonical repository is
-`itmitalles-de/essentials-calls`.
+[`itmitalles-de/simple-calls`](https://github.com/itmitalles-de/simple-calls).
 
 The stack is an extensively synthetically tested technical proof of concept,
 not a production PBX or public telephone service. Its
@@ -22,6 +22,10 @@ the repository or product name.
 
 - Graph and table editors with shared live validation, bounded undo/redo, and
   keyboard shortcuts.
+- Version-pinned Simple Business navigation, light/dark/system themes, and a
+  responsive, accessible application shell.
+- A secret-free devices and softphones guide linking only to approved official
+  provider download pages and showing non-secret local SIP parameters.
 - Extensions, IVR, ring groups, Asterisk queues, voicemail, and
   Europe/Berlin-aware schedule nodes.
 - Versioned, redacted topology import/export with v1 migration and atomic
@@ -42,7 +46,7 @@ the repository or product name.
   polling fallback, and authenticated WebSocket status updates.
 - Checksummed CLI backup/empty restore with the master key kept separate.
 - Stable, topology-free health/readiness/service metadata for a later
-  Essentials+ Office catalog.
+  Simple Business catalog.
 
 ## Local start
 
@@ -54,6 +58,11 @@ the repository or product name.
    `bootstrap-admin --username <name> --password-stdin` CLI. There are no
    default credentials.
 5. Open <http://127.0.0.1:8080>.
+
+After signing in, **Geräte & Softphones** shows the selected extension's
+non-secret local SIP endpoint and links to the official Linphone, MicroSIP, and
+Zoiper download pages. Simple Calls neither mirrors installers nor reveals,
+embeds, or downloads SIP passwords.
 
 Do not expose this Compose stack publicly. Changing environment flags does not
 make it production-ready. Rights/licensing, responsibility/revenue allocation,
@@ -78,8 +87,8 @@ npm run test:full-stack
 npm run test:e2e
 npm run test:backup-restore
 npm run scan:secrets
-npm run --silent sbom > essentials-calls-npm.cdx.json
-npm run --silent sbom:asterisk > essentials-calls-asterisk.cdx.json
+npm run --silent sbom > simple-calls-npm.cdx.json
+npm run --silent sbom:asterisk > simple-calls-asterisk.cdx.json
 git diff --check
 ```
 
@@ -95,7 +104,7 @@ production acceptance.
 | --- | --- |
 | `shared/` | Versioned domain model, schedule evaluation, import migration, redaction, validation |
 | `backend/` | Auth/RBAC, SQLite, revisions/audit, API, backup, Asterisk generation/deploy, AMI events |
-| `frontend/` | React/React Flow editor, role-aware UI, import/export, sounds, revisions |
+| `frontend/` | Simple Business shell/themes, React Flow editor, role-aware softphone guidance, import/export, sounds, revisions |
 | `asterisk/` | Checksum-pinned Asterisk 22.10.1 source image, static config, isolated preflight worker |
 | `tests/acceptance/` | SIPp/AMI/CDR full-stack acceptance |
 | `tests/e2e/` | Playwright semantic browser acceptance |

@@ -19,7 +19,7 @@ interface ManifestEntry {
 
 export interface BackupManifest {
   formatVersion: number;
-  product: 'Essentials+ Calls';
+  product: 'Simple Calls' | 'Essentials+ Calls';
   productVersion: string;
   createdAt: string;
   masterKeyIncluded: false;
@@ -89,7 +89,7 @@ export async function createBackup(options: {
     const keyRows = options.database.db.prepare('SELECT DISTINCT key_id FROM sip_secrets ORDER BY key_id').all() as Array<{ key_id: string }>;
     const manifest: BackupManifest = {
       formatVersion: BACKUP_FORMAT_VERSION,
-      product: 'Essentials+ Calls',
+      product: 'Simple Calls',
       productVersion: options.productVersion ?? '0.2.0',
       createdAt: new Date().toISOString(),
       masterKeyIncluded: false,
@@ -218,7 +218,7 @@ export async function restoreBackup(options: {
     if (!fs.existsSync(manifestPath)) throw new Error('Backup enthält kein Versionsmanifest.');
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as BackupManifest;
     if (
-      manifest.product !== 'Essentials+ Calls' ||
+      !['Simple Calls', 'Essentials+ Calls'].includes(manifest.product) ||
       manifest.formatVersion !== BACKUP_FORMAT_VERSION ||
       manifest.masterKeyIncluded !== false ||
       !Array.isArray(manifest.entries)

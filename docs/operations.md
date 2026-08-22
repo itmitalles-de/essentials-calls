@@ -32,6 +32,8 @@ are rejected by topology validation.
 | `SOUNDS_DIR` | Custom WAV prompts |
 | `SOUNDS_READER_GID` | Numeric Asterisk group ID used for mode-`0640` uploaded prompts |
 | `AMI_HOST` / `AMI_PORT` / `AMI_USERNAME` | Internal AMI connection |
+| `PBX_CLIENT_SIP_HOST` | Non-secret host label shown to authenticated users in the softphone guide; defaults to `127.0.0.1` |
+| `PBX_CLIENT_SIP_PORT` | Non-secret SIP port shown in the guide; Compose derives it from `PBX_SIP_PORT` and defaults to `5060` |
 
 Prefer a mounted secret file for the master key. Do not commit `.env`, keys,
 AMI secrets, passwords, real extension data, or provider information.
@@ -43,6 +45,14 @@ placeholder with synthetic/local values. Run the built backend CLI
 `bootstrap-admin --username <name> --password-stdin` once and feed its
 password through a protected stdin source. The CLI refuses a second bootstrap;
 additional accounts are created by an authenticated admin.
+
+The authenticated **Geräte & Softphones** page is guidance, not an embedded
+phone or software distribution channel. It links only to an explicit allowlist
+of official vendor landing pages and shows the selected extension number plus
+the configured non-secret endpoint. It never returns a SIP password, QR code,
+credential URL, generated account file, or mirrored installer. A client on a
+different host cannot use the loopback default; changing that boundary requires
+an approved NAT/firewall/audio design and real endpoint acceptance.
 
 ## Automated acceptance
 
@@ -62,8 +72,8 @@ npm run test:full-stack
 npm run test:e2e
 npm run test:backup-restore
 npm run scan:secrets
-npm run --silent sbom > essentials-calls-npm.cdx.json
-npm run --silent sbom:asterisk > essentials-calls-asterisk.cdx.json
+npm run --silent sbom > simple-calls-npm.cdx.json
+npm run --silent sbom:asterisk > simple-calls-asterisk.cdx.json
 git diff --check
 ```
 
@@ -76,7 +86,8 @@ git diff --check
   errors, request failures, and HTTP errors outside the exact negative-path
   method/path/status allowlist. Its eight cases include save/undo/redo,
   graph/table switching, revision/rollback, reload, and a fresh browser-context
-  persistence check.
+  persistence check. It also verifies the responsive application shell,
+  theme selection, and the allowlisted, secret-free softphone guidance.
 - `test:backup-restore` uses fresh source/A/C projects and volumes, requires a
   wrong key and obsolete key to fail closed, rotates A to C, verifies users,
   roles, revisions, encrypted secrets, audit, session invalidation and file

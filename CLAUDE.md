@@ -33,7 +33,7 @@ Demand-load only when relevant:
 - Never place credentials, `.env` contents, recordings, or backups in agent docs.
 - Preserve the compatibility identifiers listed in
   `docs/COMPATIBILITY_IDENTIFIERS.md`; public repository references use
-  `itmitalles-de/essentials-calls`.
+  `itmitalles-de/simple-calls`.
 - Do not enable trunk/external routing or emergency behavior. A future pilot
   requires the positive allowlist and external gates in `docs/PILOT_TEST_DID.md`.
 

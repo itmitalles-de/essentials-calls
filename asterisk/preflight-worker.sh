@@ -105,7 +105,7 @@ EOF
   cat > "$work/etc/voicemail.conf" <<EOF
 [general]
 format=wav49|gsm|wav
-serveremail=Essentials+ Calls <pbx@localhost>
+serveremail=Simple Calls <pbx@localhost>
 attach=yes
 maxmsg=100
 maxsecs=300

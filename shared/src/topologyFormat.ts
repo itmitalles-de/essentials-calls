@@ -37,7 +37,7 @@ export function redactTopology(input: Topology): Topology {
 export function createTopologyExport(topology: Topology, now = new Date()): TopologyExport {
   return {
     schemaVersion: TOPOLOGY_SCHEMA_VERSION,
-    product: 'Essentials+ Calls',
+    product: 'Simple Calls',
     exportedAt: now.toISOString(),
     redacted: true,
     topology: redactTopology(topology),

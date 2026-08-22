@@ -62,6 +62,7 @@ describe('backup and empty restore', () => {
     fs.symlinkSync('versions/good', path.join(generated, 'last-good'), 'dir');
     const archive = path.join(source, 'backup.tar.gz');
     const manifest = await createBackup({ database, soundsDir: sounds, configDir: generated, outputPath: archive });
+    assert.equal(manifest.product, 'Simple Calls');
     assert.equal(manifest.masterKeyIncluded, false);
     assert.ok(manifest.entries.some((entry) => entry.path === 'database/essentials-calls.sqlite3'));
     assert.ok(!manifest.entries.some((entry) => /key/i.test(entry.path)));

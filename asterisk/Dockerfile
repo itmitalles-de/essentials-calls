@@ -141,9 +141,9 @@ RUN curl --fail --location --retry 3 \
 FROM ubuntu-snapshot
 
 ARG ASTERISK_VERSION=22.10.1
-LABEL org.opencontainers.image.title="Essentials+ Calls synthetic Asterisk runtime" \
+LABEL org.opencontainers.image.title="Simple Calls synthetic Asterisk runtime" \
       org.opencontainers.image.version="${ASTERISK_VERSION}" \
-      org.opencontainers.image.source="https://github.com/itmitalles-de/essentials-calls"
+      org.opencontainers.image.source="https://github.com/itmitalles-de/simple-calls"
 
 RUN apt-get -o APT::Update::Error-Mode=any update \
     && apt-get install -y --no-install-recommends \

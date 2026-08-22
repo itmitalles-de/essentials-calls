@@ -10,8 +10,12 @@ session cookie and a session-bound CSRF token.
 - `GET /ready` and `GET /api/ready`
 - `GET /api/service`
 
-They expose only `Essentials+ Calls`, product/API versions, capability IDs,
-auth mode, and health/readiness state. No topology or credentials are included.
+They expose only `Simple Calls`, product/API versions, capability IDs,
+auth mode, health/readiness state, and the non-secret `sipClientEndpoint`
+metadata (`host`, `port`, `transport`, and local scope) used by the authenticated
+softphone guide. No topology, SIP username, password, master key, or other
+credential is included. The corresponding capability ID is
+`calls.softphones.guidance`.
 
 ## Authentication
 

@@ -16,7 +16,7 @@ Each immutable deployment version contains:
 | `manifest.json` | deployment ID, SHA-256 aggregate, and file map |
 
 Static transport/module/logger/CDR settings remain in the Asterisk image.
-Generated text must carry the Essentials+ Calls header, stay under 4 MiB, avoid
+Generated text must carry the Simple Calls header, stay under 4 MiB, avoid
 control characters and include/exec directives, and include required contexts.
 
 ## Names and PJSIP authentication

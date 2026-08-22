@@ -2,12 +2,15 @@
 
 ## Product and repository boundary
 
-The product is **Essentials+ Calls** and the canonical repository is
-`itmitalles-de/essentials-calls`. The historical npm namespace, persistent
+The product is **Simple Calls** and the canonical repository is
+`itmitalles-de/simple-calls`. The historical npm namespace, persistent
 identifiers and `master` branch remain separate compatibility boundaries
 documented in
 [COMPATIBILITY_IDENTIFIERS.md](COMPATIBILITY_IDENTIFIERS.md). There is no
-shared Essentials+ Office database or copied Office component.
+shared Simple Business database or copied application component. The frontend
+consumes the immutable Simple Business v0.1.1 design-system artifact pinned by
+`.simple-business-design-system.json`; application state and callflow behavior
+remain owned by this repository.
 
 ## Runtime components
 
@@ -39,7 +42,7 @@ needed on a public host interface.
 | `backend/src/security/` | scrypt passwords, AES-GCM key loading, session/CSRF/RBAC |
 | `backend/src/asterisk/` | config generator, staged deploy, AMI client/event status, WAV storage |
 | `backend/src/backup/` and `cli/` | checksummed backup, empty restore, bootstrap, key rotation |
-| `frontend/` | graph/table editor, bounded history, import/export, sounds, revisions, role-aware controls |
+| `frontend/` | pinned Simple Business shell/themes, graph/table editor, bounded history, secret-free softphone guidance, import/export, sounds, revisions, role-aware controls |
 | `asterisk/` | checksum-pinned Asterisk 22 source runtime and isolated preflight worker |
 | `tests/` and `scripts/` | disposable SIPp/AMI/CDR, Playwright, and restore acceptance |
 
@@ -119,11 +122,17 @@ events. It:
 Transient status never enters a topology revision. Authenticated WebSocket
 clients receive snapshots and changes.
 
-## Office integration contract
+## Simple Business integration contract
 
 `/health`, `/ready`, and `/api/service` expose only product name/version,
 API version, capability IDs, auth mode, and health/readiness metadata. They
 contain no topology, user, credential, or call data.
+
+The design-system package supplies tokens and UI rules, not runtime services or
+shared storage. The product shell adds responsive navigation, accessible
+dialogs/drawers, and system/light/dark themes. The softphone page consumes only
+sanitized service metadata and an explicit official-download allowlist; it is
+not a WebRTC client and does not handle SIP credentials.
 
 ## Trust boundary
 
