@@ -1,8 +1,9 @@
 # Follow-up Codex prompt
 
-Work autonomously in `itmitalles-de/visual-pbx`. Preserve the visible product
-name **Essentials+ Calls**, while keeping the repository/package namespace,
-default branch, and Asterisk 18 base technically unchanged.
+Work autonomously in `itmitalles-de/essentials-calls`. Preserve the product
+name **Essentials+ Calls**, the compatibility identifiers documented in
+`docs/COMPATIBILITY_IDENTIFIERS.md`, default branch `master`, and the
+checksum-pinned Asterisk 22.10.1 LTS source runtime.
 
 First read `AGENTS.md`, `.agent/STATE.md`, `.agent/TODO.md`, the decisions
 and architecture handoff, and `docs/VERIFICATION_MATRIX.md`. Preserve all
@@ -12,8 +13,8 @@ SIP/AMI/provider credentials.
 Treat the current local hardening as implemented only where the matrix records
 passing evidence. Re-run the complete static, Compose, image, browser,
 backup/restore, Asterisk, SIPp, AMI, and CDR regression before modifying a
-runtime boundary. Do not update the Asterisk major or perform broad dependency
-major upgrades.
+runtime boundary. Do not update beyond Asterisk major 22 or perform broad
+dependency major upgrades.
 
 Priority for a follow-up:
 

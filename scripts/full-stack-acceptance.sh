@@ -27,12 +27,12 @@ collect_failure() {
   diagnostic_dir="$REPOSITORY_ROOT/artifacts/acceptance-failure-$(date -u +%Y%m%dT%H%M%SZ)"
   mkdir -p "$diagnostic_dir"
   compose logs --no-color \
-    | sed -E 's/("?(password|secret|token|authorization|cookie)"?[[:space:]]*[:= ][[:space:]]*"?)[^",;[:space:]]+/\1[REDACTED]/Ig' \
+    | sed -E 's/("?(password|secret|token|authorization|cookie|master[_-]?key|pbx_master_key)"?[[:space:]]*[:= ][[:space:]]*"?)[^",;[:space:]]+/\1[REDACTED]/Ig' \
     > "$diagnostic_dir/compose.log"
   docker run --rm \
     -v "${COMPOSE_PROJECT_NAME}_acceptance-artifacts:/source:ro" \
     -v "$diagnostic_dir:/target" \
-    alpine:3.22 sh -c 'cp -a /source/. /target/ 2>/dev/null || true'
+    alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce sh -c 'cp -a /source/. /target/ 2>/dev/null || true'
   printf 'Failure diagnostics (redacted): %s\n' "$diagnostic_dir" >&2
 }
 
@@ -54,7 +54,7 @@ compose --profile acceptance build asterisk backend frontend acceptance
 compose --profile acceptance up -d --no-build --wait --wait-timeout 180 asterisk backend frontend
 
 startup_log=$(compose logs --no-color asterisk)
-if printf '%s\n' "$startup_log" | grep -Eiq "ERROR.*(generated/current|pjsip\.conf.*invalid|extensions\.conf.*invalid|queues\.conf.*invalid|voicemail\.conf.*invalid)"; then
+if printf '%s\n' "$startup_log" | grep -Eiq "ERROR.*(generated/current|pjsip\.conf.*invalid|extensions\.conf.*invalid|queues\.conf.*invalid|voicemail\.conf.*invalid)|Error loading module|declined to load|Some non-required modules failed to load|Could not find option"; then
   printf 'Asterisk reported a relevant startup configuration error.\n' >&2
   exit 1
 fi
@@ -69,6 +69,7 @@ compose up -d --wait --wait-timeout 120 asterisk backend frontend
 compose --profile acceptance run --rm \
   -e ACCEPTANCE_AFTER_RESTART=true \
   -e ACCEPTANCE_EXPECT_ROLLBACK=false \
+  -e ACCEPTANCE_SOURCE_EVIDENCE=/artifacts/recovery-state.json \
   acceptance
 
 completed=true

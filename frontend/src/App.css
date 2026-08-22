@@ -184,6 +184,18 @@ body {
   flex-wrap: wrap;
 }
 
+.poc-status {
+  color: var(--warning);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.poc-status-banner {
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+
 .app-header nav {
   display: flex;
   gap: 4px;

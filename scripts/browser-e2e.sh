@@ -36,7 +36,7 @@ finish() {
     diagnostic_dir="$REPOSITORY_ROOT/artifacts/browser-failure-$(date -u +%Y%m%dT%H%M%SZ)"
     mkdir -p "$diagnostic_dir"
     compose logs --no-color \
-      | sed -E 's/("?(password|secret|token|authorization|cookie)"?[[:space:]]*[:= ][[:space:]]*"?)[^",;[:space:]]+/\1[REDACTED]/Ig' \
+      | sed -E 's/("?(password|secret|token|authorization|cookie|master[_-]?key|pbx_master_key)"?[[:space:]]*[:= ][[:space:]]*"?)[^",;[:space:]]+/\1[REDACTED]/Ig' \
       > "$diagnostic_dir/compose.log" || true
     printf 'Browser failure diagnostics (redacted): %s\n' "$diagnostic_dir" >&2
   fi

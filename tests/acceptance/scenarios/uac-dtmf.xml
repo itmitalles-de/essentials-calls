@@ -19,11 +19,12 @@
       s=SIPp
       c=IN IP[media_ip_type] [media_ip]
       t=0 0
-      m=audio [media_port] RTP/AVP 0 8 101
+      m=audio [media_port] RTP/AVP 0 8 96 97
       a=rtpmap:0 PCMU/8000
       a=rtpmap:8 PCMA/8000
-      a=rtpmap:101 telephone-event/8000
-      a=fmtp:101 0-16
+      a=rtpmap:96 telephone-event/8000
+      a=fmtp:96 0-15
+      a=rtpmap:97 no-op/8000
     ]]>
   </send>
   <recv response="401" auth="true" />
@@ -59,11 +60,12 @@
       s=SIPp
       c=IN IP[media_ip_type] [media_ip]
       t=0 0
-      m=audio [media_port] RTP/AVP 0 8 101
+      m=audio [media_port] RTP/AVP 0 8 96 97
       a=rtpmap:0 PCMU/8000
       a=rtpmap:8 PCMA/8000
-      a=rtpmap:101 telephone-event/8000
-      a=fmtp:101 0-16
+      a=rtpmap:96 telephone-event/8000
+      a=fmtp:96 0-15
+      a=rtpmap:97 no-op/8000
     ]]>
   </send>
   <recv response="100" optional="true" />
@@ -75,7 +77,7 @@
       Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
       [routes]
       From: "Synthetic [service]" <sip:[service]@[remote_ip]>;tag=[pid]SIPpTag00[call_number]
-      To: [last_To:]
+      [last_To:]
       Call-ID: [call_id]
       CSeq: 2 ACK
       Contact: <sip:[service]@[local_ip]:[local_port];transport=[transport]>
@@ -89,14 +91,16 @@
       <exec play_dtmf="[field2]" />
     </action>
   </nop>
-  <pause milliseconds="2500" />
+  <!-- Keep the dialog alive long enough for Asterisk's invalid prompt and
+       configured fallback Goto to finish before the synthetic BYE. -->
+  <pause milliseconds="6000" />
   <send retrans="500">
     <![CDATA[
       BYE sip:[field1]@[remote_ip]:[remote_port] SIP/2.0
       Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
       [routes]
       From: "Synthetic [service]" <sip:[service]@[remote_ip]>;tag=[pid]SIPpTag00[call_number]
-      To: [last_To:]
+      [last_To:]
       Call-ID: [call_id]
       CSeq: 3 BYE
       Contact: <sip:[service]@[local_ip]:[local_port];transport=[transport]>

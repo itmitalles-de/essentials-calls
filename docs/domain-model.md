@@ -41,7 +41,9 @@ oversized, or incompatible imports do not partially change state.
 
 ### Extension
 
-`number`, `sipUser`, optional caller ID and voicemail settings. The legacy
+`number`, `sipUser`, optional caller ID and voicemail settings. `110` and `112`
+are reserved emergency numbers and are rejected even in the synthetic runtime;
+the product makes no emergency-reachability claim. The legacy
 `sipPassword` field is write-only during v1 migration/materialization.
 Clients receive `sipSecret: { configured: boolean }`.
 
@@ -90,7 +92,9 @@ An explicit mailbox with PIN/email/attachment settings. An extension may also
 carry embedded voicemail settings. Voicemail is terminal.
 
 `trunk` and `external` remain reserved, disabled types. They are not partial
-implementations.
+implementations, and there is no implicit outside line or fallback route. Any
+future pilot adapter requires a positive allowlist of the single approved test
+destination; a blacklist alone is insufficient.
 
 ## Edges and memberships
 
@@ -133,6 +137,11 @@ Revision rows are immutable and redacted. Each includes actor, timestamp,
 comment, source, and a node/edge/membership summary. `If-Match` prevents
 last-write-wins. Rollback is a new revision rather than mutation of history.
 The default retention is 100 revisions while protected state pointers remain.
+
+Saving is not a frontend undo boundary. It marks the saved revision as the
+dirty-state baseline while preserving valid undo/redo entries. Loading,
+importing, rollback, and browser restart begin a new local history root from the
+persisted revision.
 
 ## Runtime status
 

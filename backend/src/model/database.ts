@@ -776,7 +776,7 @@ export class PbxDatabase {
   }
 
   rotateSecrets(oldCipher: SecretCipher, newCipher: SecretCipher, actor: Actor): number {
-    return this.db.transaction(() => {
+    const rotated = this.db.transaction(() => {
       const rows = this.db.prepare('SELECT * FROM sip_secrets').all() as Array<Record<string, unknown>>;
       for (const row of rows) {
         const nodeId = String(row.node_id);
@@ -786,10 +786,14 @@ export class PbxDatabase {
           .prepare('UPDATE sip_secrets SET ciphertext=?, iv=?, tag=?, key_id=?, updated_at=? WHERE node_id=?')
           .run(encrypted.ciphertext, encrypted.iv, encrypted.tag, encrypted.keyId, nowIso(), nodeId);
       }
-      this.cipher = newCipher;
       this.auditInternal(actor, 'secret.rotate-master-key', 'sip-secrets', 'success', { count: rows.length, keyId: newCipher.id });
       return rows.length;
     })();
+    // Keep the process-local cipher aligned with durable state. If any final
+    // transaction step (including the audit insert) fails, SQLite rolls every
+    // row back and the old cipher remains authoritative in memory as well.
+    this.cipher = newCipher;
+    return rotated;
   }
 }
 

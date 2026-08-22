@@ -14,7 +14,7 @@ class FakeAmi {
   endpointCount = 2;
   endpointCounts: number[] = [];
   async runCommand(command: string) {
-    if (command === 'core show version') return 'Asterisk 18.10.0';
+    if (command === 'core show version') return 'Asterisk 22.10.1';
     if (command === 'dialplan show internal') return "[ Context 'internal' created by generated ]";
     if (command.startsWith('dialplan show ') && command.endsWith('@essentials_deploy_canary')) return command;
     return 'ok';

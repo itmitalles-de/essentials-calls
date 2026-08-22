@@ -59,11 +59,12 @@ disable their own active session.
 - The one required byte-identical pre-SQLite migration copy is the sole legacy
   plaintext exception. It is mode `0600`, excluded from normal exports and
   backups, and the original `topology.json` is removed only after commit.
-- Asterisk 18 receives an MD5 HA1 digest for the fixed local realm
-  (`username:asterisk:password`) through `auth_type=md5`; generated files do
-  not contain the plaintext SIP password. MD5 HA1 is an Asterisk 18
-  compatibility derivative, not a replacement for strong source passwords or
-  encrypted database storage.
+- Asterisk 22 receives an MD5 HA1 digest for the fixed local realm
+  (`username:asterisk:password`) through `auth_type=digest` and
+  `password_digest`; generated files do not contain the plaintext SIP
+  password. MD5 is retained only for the pinned synthetic SIPp 3.6.1 client,
+  not as a replacement for strong source passwords or encrypted database
+  storage.
 
 ## Master-key lifecycle
 
@@ -84,6 +85,11 @@ Rotation is an explicit offline administrative operation:
 Rotation decrypts and re-encrypts all SIP values in one SQLite transaction and
 audits only the count and non-secret key ID.
 
+The automated A/B/C rehearsal proves that an unrelated or obsolete key fails
+closed, a matching key restores every encrypted value, rotation is atomic, and
+an injected interruption leaves a consistent old-key-repairable database. See
+[operations/MASTER_KEY_RECOVERY.md](operations/MASTER_KEY_RECOVERY.md).
+
 ## HTTP and logging
 
 Helmet protects API responses. nginx adds CSP, frame denial, no-sniff,
@@ -94,13 +100,38 @@ deployment responsibility.
 Audit detail redacts keys matching password, secret, token, ciphertext,
 authorization, or cookie. Request errors are generic at the 500 boundary.
 Synthetic failure artifacts redact credential-like fields and are created only
-on failed acceptance runs.
+on failed acceptance runs. CI uploads only those redacted paths for three days;
+the normal backup archive and master key are never CI artifacts. A tracked-file
+high-confidence secret scan complements review but is not a substitute for a
+managed secret scanner or incident response.
+
+## Emergency and external-routing boundary
+
+The application rejects extension numbers `110` and `112`, rejects disabled
+`trunk`/`external` nodes, generates no carrier context, and has no automatic
+outside line or fallback. This is a fail-closed absence of support, not an
+emergency-service implementation. A future isolated test-DID adapter must use a
+positive destination allowlist; a blacklist cannot be its sole control.
 
 ## Known security limits
 
 - This is not penetration-tested production software.
 - SIP and RTP transport in the test stack are not TLS/SRTP.
-- The local MD5 HA1 derivative is susceptible to offline guessing if weak SIP
-  passwords are chosen.
+- The local MD5 HA1 derivative used by the SIPp 3.6 compatibility contract is
+  susceptible to offline guessing if weak SIP passwords are chosen. Moving the
+  synthetic client and configuration to SHA-256 remains a hardening item.
 - Voicemail policy, customer firewall/NAT, abuse prevention, emergency calls,
   carrier fraud controls, and public exposure are outside the local proof.
+- Asterisk 22 LTS is upstream-supported, but that removes only the former
+  runtime-EOL blocker. It does not establish carrier, network, security, legal,
+  operational, or production acceptance.
+- GitHub enforces full action SHAs; Dependabot vulnerability alerts and
+  automated security fixes are enabled, and weekly npm/action/Docker updates
+  are configured for the default branch. Managed secret and code scanning are
+  unavailable while GitHub Advanced Security is disabled, so the narrower
+  tracked-file scanner must not be represented as equivalent coverage.
+- Checksum-pinned Trivy 0.74.0 scans only already-built local images and blocks
+  every new or fixable HIGH/CRITICAL issue. The pinned Debian snapshot still
+  has 15 unique unfixed IDs (30 backend and 33 SIPp-image occurrences). Their
+  exact package-scoped exception expires on 2026-09-20; this residual risk and
+  its renewal/remediation are production blockers.

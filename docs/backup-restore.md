@@ -16,7 +16,8 @@ and includes:
   SHA-256 checksums.
 
 The archive explicitly records `masterKeyIncluded: false`. Generated PJSIP
-files contain only Asterisk 18 HA1 derivatives, not plaintext SIP passwords.
+files contain only Asterisk 22 digest HA1 derivatives, not plaintext SIP
+passwords.
 
 ## Master key
 
@@ -40,16 +41,32 @@ generated-config targets. Before copying anything it:
 7. records a restore audit event.
 
 Only then are the database, sounds, generated versions, and known-good links
-copied into their empty targets. A corrupt archive, wrong key, or non-empty
-destination leaves the target untouched.
+copied into their empty targets. Restored sessions are invalidated and custom
+sound directories/files receive mode `0750`/`0640` with the configured Asterisk
+reader group. Restore itself sets data/database mode `0700`/`0600` before it
+returns; this is verified before any backend constructor can normalize modes as
+a side effect. A corrupt archive, wrong key, invalid reader group, or non-empty
+destination leaves the target untouched. A caught population failure removes
+restore-owned entries and preserves a pre-existing empty target root and mode.
 
 ## Automated evidence
 
-`npm run test:backup-restore` starts an isolated source stack, imports and
-deploys a synthetic topology, executes synthetic calls, creates an archive,
-checks its manifest, restores into separate empty volumes, and then repeats
-registration, direct call, ring group, queue, schedule, IVR, CDR, and WebSocket
-checks against the restored target.
+`npm run test:backup-restore` starts an isolated source stack, creates three
+users/roles plus immutable/deployed revisions and a custom synthetic WAV,
+executes synthetic calls, and checks archive contents, checksums, key exclusion,
+encrypted credentials, audit, and file modes. Restore with unrelated key B must
+fail before target population. Restore with A then proves session invalidation,
+non-persistence of ephemeral AMI state, Asterisk startup, all semantic routes,
+custom IVR playback and observed RTP.
+
+The same rehearsal atomically rotates A to C, verifies every encrypted value,
+creates a new backup, requires obsolete A to fail, restores with C into another
+set of empty volumes, and repeats recovery/runtime assertions. Unit injection of
+an interrupted rotation proves transaction rollback leaves an unambiguous
+old-key-repairable state. A separate unit fault proves a handled target write
+failure is cleaned up for retry. Audit contains restore/rotation facts but no
+key value.
+See [operations/MASTER_KEY_RECOVERY.md](operations/MASTER_KEY_RECOVERY.md).
 
 This proves deterministic local recovery only. It does not prove off-site
 retention, restore-time objectives, production storage durability, carrier

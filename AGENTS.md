@@ -1,6 +1,7 @@
 # Repository Agent Guide
 
-Visual PBX is a proof-of-concept visual call-flow editor backed by Asterisk 18.
+Essentials+ Calls is a technical proof-of-concept callflow editor, simulator,
+and isolated synthetic Asterisk 22 LTS runtime.
 Treat the repository as persistent project memory and the current chat or agent
 session as temporary working memory.
 
@@ -27,6 +28,10 @@ do not maintain a duplicate backlog. A user-specified task takes precedence.
 - `docs/asterisk-notes.md`: runtime-verified Asterisk and React Flow pitfalls.
 - `docs/api.md`: REST and WebSocket contract.
 - `docs/operations.md`: ports, security, backup, testing, and troubleshooting.
+- `docs/backup-restore.md`: archive and empty-restore contract.
+- `docs/operations/MASTER_KEY_RECOVERY.md`: wrong-key and rotation rehearsal.
+- `docs/COMPATIBILITY_IDENTIFIERS.md`: retained internal identifiers.
+- `docs/PILOT_TEST_DID.md`: documentation-only future pilot gates.
 - `docs/roadmap.md`: verified behavior, limitations, decisions, and possible work.
 
 Anyone changing Asterisk generation must read the relevant mapping and pitfalls
@@ -38,7 +43,8 @@ call flow works.
 - `shared/`: topology model, structural/rule validation, and shared fixtures.
 - `backend/`: Express API, topology store, config generation, AMI, and sounds.
 - `frontend/`: React/React Flow editor, API client, audio conversion, and theme.
-- `asterisk/`: Asterisk 18 image, entrypoint, and static config templates.
+- `asterisk/`: checksum-pinned Asterisk 22 image, entrypoint, and static config
+  templates.
 - `docker-compose.yml`: runtime topology, ports, and persistent volumes.
 - `scripts/sip-register-test.py`: real SIP REGISTER diagnostic.
 
@@ -47,16 +53,21 @@ compiled workspace package. Preserve this intentional build boundary.
 
 ## Safety and proof-of-concept boundaries
 
-- This is not production-ready: there is no UI/API authentication or role model.
-- SIP passwords are stored in plaintext topology data and returned by the API.
-- The UI and SIP/RTP ports are network-exposed by Compose. Do not expose the
-  stack to the public internet or describe it as hardened.
+- This is not a production PBX. It has local sessions and server-enforced
+  viewer/editor/admin roles, but no carrier, DID, emergency, public-network, or
+  operational acceptance.
+- SIP passwords are AES-256-GCM encrypted in SQLite and masked in API/revisions;
+  never weaken this boundary or place the separately held master key in backups.
+- Published Compose ports are loopback-bound by default. Do not expose the
+  stack publicly or describe synthetic evidence as production approval.
 - Backend and AMI host ports stay loopback-bound; AMI provides full PBX control.
 - Never commit `.env`, real AMI/SIP credentials, recordings, or topology backups.
 - Validate untrusted topology shape before rule validation or field access.
 - Validation errors must block deploy in both browser and backend.
-- `pbx-data/topology.json` is the call-flow source of truth. Generated Asterisk
-  configuration is derived and may be regenerated.
+- SQLite revisions are the callflow source of truth. A legacy `topology.json`
+  may be migrated once; generated Asterisk configuration is derived.
+- `trunk`/`external`, `110`, and `112` fail closed. Do not add a general
+  outside line, emergency fallback, or non-allowlisted pilot route.
 - Preserve tested PJSIP names, queue mappings, module selection, and IVR jump
   behavior documented in `docs/asterisk-notes.md`.
 
@@ -82,7 +93,9 @@ session. Do not interrupt an atomic change merely to satisfy that range.
 - Images, when Docker/runtime work changes: `docker compose build`
 - Runtime checks: follow `docs/operations.md`; do not claim them from unit tests.
 
-CI uses Node 20, runs tests/typechecks/builds, and builds all Compose images.
+CI uses the exact Node version in `.nvmrc`, runs the complete static/runtime
+matrix, pins third-party actions to full commits, scans tracked files for
+high-confidence secrets, and publishes a short-lived npm CycloneDX SBOM.
 
 ## Handoff
 

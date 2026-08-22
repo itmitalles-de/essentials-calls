@@ -7,12 +7,18 @@ async function main(): Promise<void> {
   const input = inputIndex >= 0 ? process.argv[inputIndex + 1] : undefined;
   if (!input) throw new Error('Usage: restore --input <archive.tar.gz>');
   const dataDir = process.env.DATA_DIR ?? path.resolve('backend/data');
+  const configuredSoundsGid = process.env.SOUNDS_READER_GID;
+  const soundsReaderGid = configuredSoundsGid === undefined ? undefined : Number(configuredSoundsGid);
+  if (soundsReaderGid !== undefined && (!Number.isSafeInteger(soundsReaderGid) || soundsReaderGid < 0)) {
+    throw new Error('SOUNDS_READER_GID muss eine nichtnegative Ganzzahl sein.');
+  }
   const manifest = await restoreBackup({
     archivePath: path.resolve(input),
     dataDir,
     soundsDir: process.env.SOUNDS_DIR ?? path.join(dataDir, 'sounds'),
     configDir: process.env.CONFIG_OUT_DIR ?? path.join(dataDir, 'generated'),
     cipher: loadSecretCipher(),
+    soundsReaderGid,
   });
   console.log(`Backup vom ${manifest.createdAt} wurde in leere Zielverzeichnisse wiederhergestellt.`);
 }

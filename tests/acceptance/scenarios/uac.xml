@@ -82,7 +82,7 @@
       Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
       [routes]
       From: "Synthetic [service]" <sip:[service]@[remote_ip]>;tag=[pid]SIPpTag00[call_number]
-      To: [last_To:]
+      [last_To:]
       Call-ID: [call_id]
       CSeq: 2 ACK
       Contact: <sip:[service]@[local_ip]:[local_port];transport=[transport]>
@@ -99,7 +99,7 @@
       Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
       [routes]
       From: "Synthetic [service]" <sip:[service]@[remote_ip]>;tag=[pid]SIPpTag00[call_number]
-      To: [last_To:]
+      [last_To:]
       Call-ID: [call_id]
       CSeq: 3 BYE
       Contact: <sip:[service]@[local_ip]:[local_port];transport=[transport]>

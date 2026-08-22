@@ -1,4 +1,4 @@
-# Asterisk 18 mapping
+# Asterisk 22 mapping
 
 Source: `backend/src/asterisk/configGenerator.ts` and
 `backend/src/asterisk/deploy.ts`.
@@ -26,21 +26,27 @@ Asterisk identifies inbound registrations by endpoint name. Call-flow targets
 are `node_<sanitized-node-id>`; IVR contexts are
 `ivr_<sanitized-node-id>`; queue names derive from node IDs.
 
-The encrypted password is materialized only in backend memory. Asterisk 18 does
-not support the later `password_digest` option, so the generator writes:
+The encrypted password is materialized only in backend memory. The generator
+uses Asterisk 22's digest form without the deprecated `md5_cred` field:
 
 ```ini
 [101]
 type=auth
-auth_type=md5
+auth_type=digest
 realm=asterisk
 username=101
-md5_cred=<MD5 of 101:asterisk:password>
+password_digest=MD5:<MD5 of 101:asterisk:password>
+supported_algorithms_uas=MD5
 ```
 
-This preserves Asterisk 18 compatibility and removes plaintext from generated
-storage. Strong random SIP passwords and restrictive file permissions remain
-necessary because HA1 permits offline guessing.
+This removes plaintext from generated storage. MD5 is constrained to the
+synthetic SIPp 3.6.1 compatibility contract; Asterisk 22/PJProject also supports
+stronger digests. Strong random SIP passwords and restrictive file permissions
+remain necessary because HA1 permits offline guessing.
+
+Generated endpoints set `direct_media=no` so the isolated Asterisk runtime
+remains on the media path and synthetic RTP evidence is observable. This is a
+test-runtime choice, not real NAT or provider acceptance.
 
 ## Dialplan mapping
 
@@ -62,12 +68,17 @@ Every node also receives a synthetic entrypoint starting at 600. These are
 local test aids, not DIDs. The validator warns if an internal extension shadows
 one.
 
+No trunk or external context is generated. `110` and `112` cannot be extension
+numbers, and there is no automatic outside-line or emergency fallback. The
+future pilot plan requires an explicit positive allowlist; it is not part of
+this mapping.
+
 ## Staging, preflight, and activation
 
 Generation writes mode-0640 files into
 `versions/.staging-<deployment-id>`, then renames the complete directory.
 The Asterisk container's private filesystem worker copies static config into a
-disposable tree, starts a separate Asterisk 18 process, loads the candidate,
+disposable tree, starts a separate Asterisk 22 process, loads the candidate,
 and checks dialplan/PJSIP readiness. No Docker socket or public validation
 endpoint is used.
 
@@ -99,6 +110,7 @@ implemented.
 ## Runtime evidence boundary
 
 The acceptance stack proves these configurations load and execute on the
-pinned Ubuntu 22.04 Asterisk 18 package using SIPp, AMI, and CDR events. It says
-nothing about a real provider, public number, emergency call, customer
-firewall/NAT, handset, or real-network audio quality.
+checksum-pinned Asterisk 22.10.1 source build on a digest-pinned Ubuntu base
+using SIPp, AMI, and CDR events. It says nothing about a real provider, public
+number, emergency call, customer firewall/NAT, handset, or real-network audio
+quality.

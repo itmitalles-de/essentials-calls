@@ -5,6 +5,7 @@ services:
 
   acceptance:
     profiles: [acceptance]
+    image: "${COMPOSE_PROJECT_NAME:-visual-pbx}-acceptance:0.1.0-sipp3.6.1-node24.19.0"
     build:
       context: .
       dockerfile: tests/acceptance/Dockerfile

@@ -104,13 +104,15 @@ export function generatePjsipConf(topology: Topology): string {
     lines.push(
       `[${id}]`,
       'type=auth',
-      // Asterisk 18 predates password_digest but supports the equivalent
-      // pre-computed MD5 HA1 credential. The plaintext remains transient in
-      // memory and never lands in the generated PJSIP configuration.
-      'auth_type=md5',
+      // Asterisk 22 accepts a pre-computed digest without the deprecated
+      // auth_type=md5/md5_cred fields. MD5 remains the explicitly constrained
+      // synthetic SIPp 3.6 compatibility algorithm; plaintext remains
+      // transient in memory and never lands in generated configuration.
+      'auth_type=digest',
       'realm=asterisk',
       `username=${configValue(sipUser, 'sipUser')}`,
-      `md5_cred=${crypto.createHash('md5').update(`${sipUser}:asterisk:${configValue(sipPassword, 'sipPassword')}`).digest('hex')}`,
+      `password_digest=MD5:${crypto.createHash('md5').update(`${sipUser}:asterisk:${configValue(sipPassword, 'sipPassword')}`).digest('hex')}`,
+      'supported_algorithms_uas=MD5',
       ''
     );
     lines.push(
@@ -119,6 +121,10 @@ export function generatePjsipConf(topology: Topology): string {
       'context=internal',
       'disallow=all',
       'allow=ulaw,alaw',
+      // Keep media anchored in the isolated Asterisk runtime. Besides making
+      // IVR/queue behavior deterministic, this prevents native-bridge
+      // re-INVITEs from bypassing the synthetic RTP observer.
+      'direct_media=no',
       `auth=${id}`,
       `aors=${id}`,
       `callerid="${display(callerIdName ?? ext.label)}" <${number}>`,

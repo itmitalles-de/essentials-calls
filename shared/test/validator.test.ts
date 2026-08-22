@@ -72,6 +72,19 @@ describe('validateTopology', () => {
     assert.ok(codes(validateTopology(t)).includes('duplicate-extension-number'));
   });
 
+  test('fails closed for emergency numbers and reserved external routing nodes', () => {
+    for (const number of ['110', '112']) {
+      const issues = validateTopology(topology({ nodes: [extension(`emergency-${number}`, number)] }));
+      assert.ok(codes(issues).includes('reserved-emergency-number'));
+    }
+    for (const type of ['trunk', 'external'] as const) {
+      const issues = validateTopology(topology({
+        nodes: [{ id: `reserved-${type}`, type, label: `Reserved ${type}`, properties: {} }],
+      }));
+      assert.ok(codes(issues).includes('disabled-node-type'));
+    }
+  });
+
   test('rejects duplicate mailboxes across extension and voicemail nodes', () => {
     const t = topology({
       nodes: [

@@ -26,6 +26,11 @@ const SYNTHETIC_SIP_SECRETS = [
   'synthetic-102-pass-2026',
   'synthetic-103-pass-2026',
 ];
+const ROLE_FIXTURES = [
+  { username: 'synthetic-recovery-viewer', password: 'SyntheticRecoveryViewer-2026!', role: 'viewer' },
+  { username: 'synthetic-recovery-editor', password: 'SyntheticRecoveryEditor-2026!', role: 'editor' },
+];
+const RECOVERY_EVIDENCE_FILE = path.join(ARTIFACT_ROOT, 'recovery-state.json');
 
 const results = [];
 let cookie = '';
@@ -112,6 +117,22 @@ async function login() {
   record('authenticated admin session');
 }
 
+async function ensureRoleFixtures() {
+  const listed = await api('/users');
+  invariant(listed.response.ok, `User listing failed: HTTP ${listed.response.status}`);
+  const existing = new Set(listed.body.users.map((user) => user.username));
+  for (const fixture of ROLE_FIXTURES) {
+    if (existing.has(fixture.username)) continue;
+    const created = await api('/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fixture),
+    });
+    invariant(created.response.status === 201, `Could not create synthetic ${fixture.role}: HTTP ${created.response.status}`);
+  }
+  record('administrator, editor and viewer role fixtures');
+}
+
 async function loadTopology() {
   const { response, body } = await api('/topology');
   invariant(response.ok, `Topology load failed: HTTP ${response.status}`);
@@ -187,6 +208,28 @@ async function uploadCustomIvrPrompt() {
   activeRevision = saved.body.activeRevision;
 }
 
+async function assertRestoredCustomIvrPrompt() {
+  const [directoryInfo, fileInfo, sounds] = await Promise.all([
+    stat(SHARED_SOUNDS_DIR),
+    stat(path.join(SHARED_SOUNDS_DIR, `${CUSTOM_PROMPT_NAME}.wav`)),
+    api('/sounds'),
+  ]);
+  invariant(sounds.response.ok, `Restored sound inventory failed: HTTP ${sounds.response.status}`);
+  invariant(
+    sounds.body.sounds.some((sound) => sound.reference === CUSTOM_PROMPT_REFERENCE),
+    'Restored custom WAV is missing from the authoritative sound inventory.'
+  );
+  invariant(
+    directoryInfo.gid === ASTERISK_SOUND_GID && (directoryInfo.mode & 0o777) === 0o750,
+    `Restored sound directory permissions are wrong (gid=${directoryInfo.gid}, mode=${(directoryInfo.mode & 0o777).toString(8)}).`
+  );
+  invariant(
+    fileInfo.gid === ASTERISK_SOUND_GID && (fileInfo.mode & 0o777) === 0o640,
+    `Restored custom WAV permissions are wrong (gid=${fileInfo.gid}, mode=${(fileInfo.mode & 0o777).toString(8)}).`
+  );
+  record('restored custom WAV inventory and Asterisk file permissions', `gid ${fileInfo.gid}, mode ${(fileInfo.mode & 0o777).toString(8)}`);
+}
+
 async function blockedDeploy() {
   const loaded = await loadTopology();
   const invalid = structuredClone(loaded.topology);
@@ -213,9 +256,12 @@ async function deploy() {
     path.join(process.env.ACCEPTANCE_CONFIG_DIR ?? '/shared-config-control', 'current', 'pjsip_generated.conf'),
     'utf8'
   );
-  invariant(/auth_type=md5[\s\S]*md5_cred=[0-9a-f]{32}/.test(generatedPjsip), 'Asterisk 18 HA1 auth was not generated.');
+  invariant(
+    /auth_type=digest[\s\S]*password_digest=MD5:[0-9a-f]{32}[\s\S]*supported_algorithms_uas=MD5/.test(generatedPjsip),
+    'Asterisk 22 digest HA1 auth was not generated.'
+  );
   invariant(!/synthetic-(?:101|102|103)-pass-2026/.test(generatedPjsip), 'Generated PJSIP config contains a plaintext SIP secret.');
-  record('generated PJSIP stores Asterisk 18 HA1 credentials without plaintext');
+  record('generated PJSIP stores Asterisk 22 digest HA1 credentials without plaintext');
   activeRevision = attempt.body.revision;
   record('Asterisk staging preflight, atomic activate, reload and runtime canary', attempt.body.deploymentId);
   return attempt.body;
@@ -305,7 +351,10 @@ class AmiConnection {
 
   async command(command) {
     const response = await this.action({ Action: 'Command', Command: command });
-    invariant(response.Response !== 'Error', `AMI command failed (${command}): ${response.Message ?? ''}`);
+    invariant(
+      response.Response !== 'Error',
+      `AMI command failed (${command}): ${response.Message ?? ''}; response ${JSON.stringify(response)}`
+    );
     return response.Output ?? response.Message ?? '';
   }
 
@@ -473,19 +522,37 @@ async function originate(ami, extension, context = 'entrypoints', callerLifetime
 
 async function syntheticCallflows(ami) {
   const before = ami.events.length;
-  for (const [index, extension] of [603, 606, 607].entries()) {
+  const routes = [
+    {
+      extension: 603,
+      name: 'ring group',
+      matches: (event) => event.Event === 'Newexten' && event.Application === 'Dial' && /PJSIP\/102&PJSIP\/103/.test(event.AppData ?? ''),
+    },
+    {
+      extension: 606,
+      name: 'queue',
+      matches: (event) => event.Event === 'Newexten' && event.Application === 'Queue' && /^queue_support(?:,|$)/.test(event.AppData ?? ''),
+    },
+    {
+      extension: 607,
+      name: 'schedule open branch',
+      matches: (event) => event.Event === 'Newexten' && event.Application === 'Dial' && /PJSIP\/102&PJSIP\/103/.test(event.AppData ?? ''),
+    },
+  ];
+  for (const [index, route] of routes.entries()) {
     const endpoint102 = startUas('102', 'synthetic-102-pass-2026', 5082 + index);
     try {
       await endpoint102.started;
       await waitForRegistered(ami, ['102']);
-      await originate(ami, extension);
-      await sleep(800);
+      const routeStart = ami.events.length;
+      await originate(ami, route.extension);
+      await waitFor(`${route.name} application`, () => ami.events.slice(routeStart).some(route.matches), 8000);
+      record(`${route.name} reaches its expected Asterisk application`);
     } finally {
       endpoint102.stop();
       await sleep(250);
     }
   }
-  record('ring group, queue and schedule synthetic call paths');
   await waitFor('queue caller departure event', () => ami.events.slice(before).some(
     (event) => ['QueueCallerLeave', 'QueueCallerAbandon', 'Leave', 'AgentComplete'].includes(event.Event)
   ), 12_000);
@@ -499,9 +566,19 @@ async function syntheticCallflows(ami) {
   );
   record('AMI channel and hangup event stream');
 
-  await originate(ami, 604);
-  await originate(ami, 605);
-  record('IVR announcement/timeout and voicemail applications execute synthetically');
+  const ivrStart = ami.events.length;
+  await originate(ami, 604, 'entrypoints', 6);
+  await waitFor('IVR timeout voicemail destination', () => ami.events.slice(ivrStart).some(
+    (event) => event.Event === 'Newexten' && event.Application === 'VoiceMail' && /^900@default/.test(event.AppData ?? '')
+  ), 12_000);
+  record('IVR announcement and timeout reach voicemail');
+
+  const voicemailStart = ami.events.length;
+  await originate(ami, 605, 'entrypoints', 3);
+  await waitFor('direct voicemail application', () => ami.events.slice(voicemailStart).some(
+    (event) => event.Event === 'Newexten' && event.Application === 'VoiceMail' && /^900@default/.test(event.AppData ?? '')
+  ), 8000);
+  record('direct voicemail application executes synthetically');
 }
 
 async function queueUnavailableTimeoutFallback(ami) {
@@ -558,16 +635,35 @@ async function reloadExistingQueue(ami) {
   return attempt.body;
 }
 
-async function dtmfPaths() {
+async function dtmfPaths(ami) {
   const cases = [
-    { name: 'valid DTMF selection', digit: '1' },
-    { name: 'invalid IVR extension path', digit: '9' },
+    {
+      name: 'valid DTMF selection reaches ring group',
+      digit: '1',
+      matches: (event) => event.Event === 'Newexten' && event.Application === 'Dial' && /PJSIP\/102&PJSIP\/103/.test(event.AppData ?? ''),
+    },
+    {
+      name: 'invalid DTMF retry limit reaches explicit fallback',
+      digit: '9',
+      matches: (event) => event.Event === 'Newexten' && event.Application === 'Dial' && /^PJSIP\/103(?:,|$)/.test(event.AppData ?? ''),
+    },
   ];
   for (let index = 0; index < cases.length; index++) {
     const item = cases[index];
     const file = `/tmp/dtmf-${index}.csv`;
     await BunCompatWrite(file, `SEQUENTIAL\nsynthetic-101-pass-2026;604;${item.digit}\n`);
+    const before = ami.events.length;
     await runSipp([ASTERISK_HOST, '-sf', 'scenarios/uac-dtmf.xml', '-inf', file, '-s', '101', '-au', '101', '-ap', 'synthetic-101-pass-2026', '-p', String(5091 + index), '-m', '1', '-nostdin'], item.name, 30_000);
+    try {
+      await waitFor(item.name, () => ami.events.slice(before).some(item.matches), 8000);
+    } catch (error) {
+      const routeEvidence = ami.events.slice(before)
+        .filter((event) => /^(?:DTMFBegin|DTMFEnd|Newexten|Hangup)$/.test(event.Event ?? ''))
+        .map(({ Event, Digit, Extension, Context, Application, AppData, CauseTxt }) => ({
+          Event, Digit, Extension, Context, Application, AppData, CauseTxt,
+        }));
+      throw new Error(`${error.message}; observed route evidence: ${JSON.stringify(routeEvidence)}`);
+    }
     record(item.name);
   }
 }
@@ -641,14 +737,63 @@ async function rawWebSocketFrame() {
 
 async function persistEvidence() {
   const current = await loadTopology();
-  invariant(current.topology.id === 'synthetic-acceptance-topology' && current.activeRevision === activeRevision, 'Topology/deploy state did not persist.');
+  invariant(
+    current.topology.id === 'synthetic-acceptance-topology' && current.activeRevision !== null && current.lastGoodRevision !== null,
+    'Topology/deploy state did not persist.'
+  );
   const revisions = await api('/topology/revisions');
   invariant(revisions.response.ok && revisions.body.revisions.length >= 2, 'Revision history missing after import/deploy.');
-  record('SQLite topology, revision and active-deploy persistence');
+  invariant(
+    revisions.body.revisions.some((entry) => entry.revision === current.activeRevision && entry.active),
+    'Active revision is not represented in immutable history.'
+  );
+  const users = await api('/users');
+  invariant(users.response.ok, `Restored user listing failed: HTTP ${users.response.status}`);
+  invariant(
+    ['admin', 'editor', 'viewer'].every((role) => users.body.users.some((user) => user.role === role)),
+    'User roles did not persist.'
+  );
+  const audit = await api('/audit?limit=500');
+  invariant(audit.response.ok, `Restored audit listing failed: HTTP ${audit.response.status}`);
+  if (process.env.ACCEPTANCE_AFTER_RESTORE === 'true') {
+    invariant(audit.body.audit.some((entry) => entry.action === 'backup.restore'), 'Restore audit event is missing.');
+  }
+  if (process.env.ACCEPTANCE_EXPECT_ROTATION_AUDIT === 'true') {
+    invariant(audit.body.audit.some((entry) => entry.action === 'secret.rotate-master-key'), 'Master-key rotation audit event is missing.');
+  }
+  const redacted = JSON.stringify(current.topology);
+  invariant(!redacted.includes('sipPassword') && !SYNTHETIC_SIP_SECRETS.some((secret) => redacted.includes(secret)), 'Restored API topology leaked SIP credentials.');
+  invariant(!/"(?:ami|availability|activity|connection|runtimeStatus|nodeStatus)"\s*:/i.test(redacted), 'Ephemeral AMI state leaked into persisted topology.');
+
+  const sourceEvidencePath = process.env.ACCEPTANCE_SOURCE_EVIDENCE;
+  if (sourceEvidencePath) {
+    const expected = JSON.parse(await readFile(sourceEvidencePath, 'utf8'));
+    invariant(current.topology.id === expected.topologyId, 'Restored topology ID differs from the source backup.');
+    invariant(current.revision === expected.revision, 'Restored current revision differs from the source backup.');
+    invariant(current.activeRevision === expected.activeRevision, 'Restored active revision differs from the source backup.');
+    invariant(current.lastGoodRevision === expected.lastGoodRevision, 'Restored last-good revision differs from the source backup.');
+  }
+  record('SQLite users, roles, topology, revisions, audit and active-deploy persistence');
+}
+
+async function writeRecoveryEvidence() {
+  const current = await loadTopology();
+  const { mkdir, writeFile } = await import('node:fs/promises');
+  await mkdir(ARTIFACT_ROOT, { recursive: true });
+  await writeFile(
+    RECOVERY_EVIDENCE_FILE,
+    `${JSON.stringify({
+      topologyId: current.topology.id,
+      revision: current.revision,
+      activeRevision: current.activeRevision,
+      lastGoodRevision: current.lastGoodRevision,
+    })}\n`,
+    { encoding: 'utf8', mode: 0o600 }
+  );
 }
 
 async function diagnosticArtifacts(error) {
-  const redact = (value) => [ADMIN_PASSWORD, AMI_SECRET, ...SYNTHETIC_SIP_SECRETS]
+  const redact = (value) => [ADMIN_PASSWORD, AMI_SECRET, ...SYNTHETIC_SIP_SECRETS, ...ROLE_FIXTURES.map((fixture) => fixture.password)]
     .filter(Boolean)
     .reduce((output, secret) => output.replaceAll(secret, '[REDACTED]'), String(value));
   const safe = {
@@ -675,6 +820,7 @@ async function main() {
   invariant(frontend.ok && (await frontend.text()).includes('Essentials+ Calls'), 'Frontend health/branding failed.');
   record('frontend health and branding');
   await login();
+  await ensureRoleFixtures();
   await loadTopology();
   if (process.env.ACCEPTANCE_AFTER_RESTART === 'true') {
     await persistEvidence();
@@ -682,11 +828,13 @@ async function main() {
   }
   if (process.env.ACCEPTANCE_AFTER_RESTORE === 'true') {
     await persistEvidence();
+    await assertRestoredCustomIvrPrompt();
     const ami = new AmiConnection();
     try {
       await ami.connect();
       const version = await ami.command('core show version');
-      invariant(/Asterisk 18\./.test(version), `Unexpected restored Asterisk major: ${version}`);
+      invariant(/Asterisk 22\./.test(version), `Unexpected restored Asterisk major: ${version}`);
+      await customIvrMedia(ami);
       await directCallAndReregistration(ami);
       await syntheticCallflows(ami);
       await cdrEvidence(ami);
@@ -705,13 +853,13 @@ async function main() {
   try {
     await ami.connect();
     const version = await ami.command('core show version');
-    invariant(/Asterisk 18\./.test(version), `Unexpected Asterisk major: ${version}`);
-    record('Asterisk 18 runtime without configuration rejection');
+    invariant(/Asterisk 22\./.test(version), `Unexpected Asterisk major: ${version}`);
+    record('Asterisk 22 runtime without configuration rejection');
     await customIvrMedia(ami);
     await directCallAndReregistration(ami);
     await syntheticCallflows(ami);
     await queueUnavailableTimeoutFallback(ami);
-    await dtmfPaths();
+    await dtmfPaths(ami);
     await cdrEvidence(ami);
     await websocketEvidence();
     const reloaded = await reloadExistingQueue(ami);
@@ -719,11 +867,14 @@ async function main() {
   } finally {
     ami.close();
   }
+  await writeRecoveryEvidence();
   process.stdout.write(`\nSynthetic acceptance complete: ${results.length} semantic checks passed.\n`);
 }
 
 main().catch(async (error) => {
   await diagnosticArtifacts(error);
-  process.stderr.write(`FAIL ${String(error?.stack ?? error).replaceAll(ADMIN_PASSWORD, '[REDACTED]').replaceAll(AMI_SECRET, '[REDACTED]')}\n`);
+  const sensitive = [ADMIN_PASSWORD, AMI_SECRET, ...SYNTHETIC_SIP_SECRETS, ...ROLE_FIXTURES.map((fixture) => fixture.password)].filter(Boolean);
+  const redacted = sensitive.reduce((value, secret) => value.replaceAll(secret, '[REDACTED]'), String(error?.stack ?? error));
+  process.stderr.write(`FAIL ${redacted}\n`);
   process.exitCode = 1;
 });

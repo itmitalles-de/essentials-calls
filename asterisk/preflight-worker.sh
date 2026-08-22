@@ -121,7 +121,10 @@ EOF
   asterisk_pid=$!
   ready=false
   attempt=0
-  while [ "$attempt" -lt 200 ]; do
+  # A source-built Asterisk 22 performs more module dependency work than the
+  # former distribution package. Keep the worker below the backend deadline
+  # while allowing slow two-core CI builders enough time to become ready.
+  while [ "$attempt" -lt 600 ]; do
     if [ -S "$work/run/asterisk.ctl" ]; then
       /usr/sbin/asterisk -C "$work/etc/asterisk.conf" -rx 'core show version' > "$work/core.out" 2>&1 || true
       if grep -q 'Asterisk' "$work/core.out"; then
@@ -149,7 +152,7 @@ EOF
   /usr/sbin/asterisk -C "$work/etc/asterisk.conf" -rx 'core stop now' >/dev/null 2>&1 || true
   wait "$asterisk_pid" 2>/dev/null || true
 
-  if grep -Eiq "ERROR.*(generated|pjsip\.conf|extensions\.conf|queues\.conf|voicemail\.conf|invalid format|cannot be parsed)" "$startup_log"; then
+  if grep -Eiq "ERROR.*(generated|pjsip\.conf|extensions\.conf|queues\.conf|voicemail\.conf|invalid format|cannot be parsed)|Error loading module|declined to load|Some non-required modules failed to load|Could not find option" "$startup_log"; then
     validation_ok=false
   fi
 

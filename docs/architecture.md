@@ -2,10 +2,12 @@
 
 ## Product and repository boundary
 
-The visible product is **Essentials+ Calls**. The repository, npm namespace,
-default branch, and Asterisk 18 base remain the independent `visual-pbx`
-technical implementation. There is no shared Essentials+ Office database or
-copied Office component.
+The product is **Essentials+ Calls** and the canonical repository is
+`itmitalles-de/essentials-calls`. The historical npm namespace, persistent
+identifiers and `master` branch remain separate compatibility boundaries
+documented in
+[COMPATIBILITY_IDENTIFIERS.md](COMPATIBILITY_IDENTIFIERS.md). There is no
+shared Essentials+ Office database or copied Office component.
 
 ## Runtime components
 
@@ -18,7 +20,7 @@ nginx + React :8080  ---->  Express :4000  ----> SQLite WAL (/data)
                 shared volumes <--+  +--> long-lived AMI :5038
                      |                       |
                      v                       v
-           generated config/sounds <---- Asterisk 18 :5060/RTP
+           generated config/sounds <---- Asterisk 22 :5060/RTP
                                                ^
                                                |
                                       SIPp synthetic clients
@@ -38,7 +40,7 @@ needed on a public host interface.
 | `backend/src/asterisk/` | config generator, staged deploy, AMI client/event status, WAV storage |
 | `backend/src/backup/` and `cli/` | checksummed backup, empty restore, bootstrap, key rotation |
 | `frontend/` | graph/table editor, bounded history, import/export, sounds, revisions, role-aware controls |
-| `asterisk/` | pinned Asterisk 18 base config and isolated preflight worker |
+| `asterisk/` | checksum-pinned Asterisk 22 source runtime and isolated preflight worker |
 | `tests/` and `scripts/` | disposable SIPp/AMI/CDR, Playwright, and restore acceptance |
 
 The shared validator gives immediate client feedback, but the backend always
@@ -62,7 +64,7 @@ must be handled as sensitive, and is excluded from normal exports and backups.
 All active credential rows are encrypted.
 
 Custom sounds and generated Asterisk versions remain separate named volumes.
-Generated files are derivatives. PJSIP files contain an Asterisk 18 HA1
+Generated files are derivatives. PJSIP files contain an Asterisk 22 digest HA1
 credential, not the source password.
 
 ## Revision and editing flow
@@ -75,9 +77,12 @@ revision. Current, active, and last-known-good revisions are protected from
 retention pruning.
 
 The frontend's bounded history tracks node, edge, membership, and property
-changes. Selection and viewport moves do not create history. Loading/importing/
-rolling back resets history; saving updates the saved baseline without erasing
-valid undo state.
+changes. Selection and viewport moves do not create history. Loading, importing,
+and rolling back reset history. Saving creates a revision and updates the
+dirty-state baseline, but deliberately does not erase undo or redo: save is not
+an editor-history boundary. Undo after save can therefore make the editor dirty
+by returning to a topology that predates that revision. Reloading always loads
+the persisted current revision as a fresh history root.
 
 ## Atomic deploy protocol
 
@@ -86,7 +91,7 @@ valid undo state.
 3. Materialize SIP secrets transiently.
 4. Generate all files in a private staging directory.
 5. Reject unsafe generated text and excessive output.
-6. Ask an isolated Asterisk 18 process in the container to load the candidate.
+6. Ask an isolated Asterisk 22 process in the container to load the candidate.
 7. Rename staging to an immutable version directory.
 8. atomically switch the `current` symlink.
 9. run targeted dialplan/PJSIP/queue/voicemail reloads through AMI.
@@ -122,7 +127,9 @@ contain no topology, user, credential, or call data.
 
 ## Trust boundary
 
-This architecture hardens a local single-tenant proof of concept. TLS
+This architecture hardens a local single-tenant proof of concept. External
+routes are absent by default; reserved `110`/`112` extension numbers fail
+validation and no automatic outside-line or emergency fallback exists. TLS
 termination, production network segmentation, real carrier behavior, DID and
 emergency routing, legal responsibility, physical endpoints, and operational
 acceptance remain external.

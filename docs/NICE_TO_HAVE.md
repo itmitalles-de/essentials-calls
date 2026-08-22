@@ -1,27 +1,32 @@
 # Nice-to-have (explicitly deferred)
 
-The following ideas are intentionally documentation-only in this scope. No
-code, dependencies, feature flags, placeholder tables, or reserved database
-schema were added for them:
+The following ideas are documentation-only. No code, dependencies, feature
+flags, placeholder tables, database schema, product promise, or implied roadmap
+commitment exists for them:
 
 - WebRTC softphone
-- Call recording
-- Transcription
-- Speech-to-text IVR
-- Text-to-speech
-- Extended queue reporting
-- Call-center wallboard
-- Physical-phone provisioning
-- Multiple PBX instances
-- High availability
-- Mobile application
+- call recording
+- transcription or speech analytics
+- AI receptionist or AI-assisted authoring
+- speech-to-text IVR or text-to-speech
+- contact-centre reporting, SLA analytics, or wallboard
+- physical-phone provisioning
+- multi-tenant/cloud PBX or multiple PBX instances
+- high availability or Kubernetes
+- mobile application
 - OIDC/SSO with Essentials+ Office
-- External holiday calendars
-- AI-assisted call-flow authoring
+- external holiday calendars
 - CRM integrations
-- Fax
-- SMS
-- Additional provider adapters
+- fax or SMS
+- billing or tariff accounting
+- additional provider adapters
+- public exposure or customer operation
+- any further Asterisk major-version migration beyond 22 LTS
 
-Each item needs its own product, privacy, security, operations, and verification
-scope before implementation.
+A future isolated test-DID evaluation is not a nice-to-have feature and is not
+implemented. Its mandatory external gates and narrow positive allowlist are in
+[PILOT_TEST_DID.md](PILOT_TEST_DID.md). Recording, transcription, and AI remain
+forbidden in that pilot.
+
+Each deferred item needs its own product, rights, privacy, security, operations,
+and verification scope before implementation.

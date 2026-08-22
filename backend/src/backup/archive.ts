@@ -118,16 +118,89 @@ function assertEmpty(directory: string, label: string): void {
   if (fs.readdirSync(directory).length > 0) throw new Error(`${label} muss für einen Restore leer sein: ${directory}`);
 }
 
+function applySoundPermissions(directory: string, readerGid?: number, includeRoot = true): void {
+  if (readerGid !== undefined && (!Number.isSafeInteger(readerGid) || readerGid < 0)) {
+    throw new Error('SOUNDS_READER_GID muss eine nichtnegative Ganzzahl sein.');
+  }
+  const visit = (entryPath: string, isRoot = false): void => {
+    const entry = fs.lstatSync(entryPath);
+    if (entry.isSymbolicLink()) return;
+    if (entry.isDirectory()) {
+      for (const child of fs.readdirSync(entryPath)) visit(path.join(entryPath, child));
+      if (isRoot && !includeRoot) return;
+      fs.chmodSync(entryPath, 0o750);
+      if (readerGid !== undefined) fs.chownSync(entryPath, -1, readerGid);
+    } else if (entry.isFile()) {
+      fs.chmodSync(entryPath, 0o640);
+      if (readerGid !== undefined) fs.chownSync(entryPath, -1, readerGid);
+    }
+  };
+  visit(directory, true);
+}
+
+interface RestoreTarget {
+  directory: string;
+  existed: boolean;
+  originalMode?: number;
+  writtenEntries: string[];
+}
+
+function inspectRestoreTarget(directory: string, label: string): RestoreTarget {
+  assertEmpty(directory, label);
+  const existed = fs.existsSync(directory);
+  const stat = existed ? fs.statSync(directory) : undefined;
+  return {
+    directory,
+    existed,
+    originalMode: stat ? stat.mode & 0o777 : undefined,
+    writtenEntries: [],
+  };
+}
+
+function createRestoreTarget(target: RestoreTarget, mode?: number): void {
+  fs.mkdirSync(target.directory, { recursive: true, ...(mode === undefined ? {} : { mode }) });
+  if (mode !== undefined) fs.chmodSync(target.directory, mode);
+}
+
+function copyRestoreEntries(source: string, target: RestoreTarget): void {
+  for (const name of fs.readdirSync(source)) {
+    target.writtenEntries.push(name);
+    fs.cpSync(path.join(source, name), path.join(target.directory, name), {
+      recursive: true,
+      dereference: false,
+      verbatimSymlinks: true,
+    });
+  }
+}
+
+function rollBackRestoreTarget(target: RestoreTarget): void {
+  for (const name of target.writtenEntries.reverse()) {
+    fs.rmSync(path.join(target.directory, name), { recursive: true, force: true });
+  }
+  if (!fs.existsSync(target.directory)) return;
+  if (target.existed) {
+    if (target.originalMode !== undefined) fs.chmodSync(target.directory, target.originalMode);
+    return;
+  }
+  try {
+    fs.rmdirSync(target.directory);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOTEMPTY') throw error;
+  }
+}
+
 export async function restoreBackup(options: {
   archivePath: string;
   dataDir: string;
   soundsDir: string;
   configDir: string;
   cipher: SecretCipher;
+  soundsReaderGid?: number;
 }): Promise<BackupManifest> {
-  assertEmpty(options.dataDir, 'DATA_DIR');
-  assertEmpty(options.soundsDir, 'SOUNDS_DIR');
-  assertEmpty(options.configDir, 'CONFIG_OUT_DIR');
+  const dataTarget = inspectRestoreTarget(options.dataDir, 'DATA_DIR');
+  const soundsTarget = inspectRestoreTarget(options.soundsDir, 'SOUNDS_DIR');
+  const configTarget = inspectRestoreTarget(options.configDir, 'CONFIG_OUT_DIR');
+  const targets = [dataTarget, soundsTarget, configTarget];
   const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'essentials-calls-restore-'));
   try {
     await tar.x({
@@ -160,20 +233,49 @@ export async function restoreBackup(options: {
     const verificationDatabase = new PbxDatabase(path.join(staging, 'verification-data'), options.cipher, {
       databasePath: extractedDatabase,
     });
-    verificationDatabase.materializedTopology();
-    verificationDatabase.db.prepare('DELETE FROM sessions').run();
-    verificationDatabase.audit({ id: null, username: 'restore-cli' }, 'backup.restore', path.basename(options.archivePath), 'success', {
-      formatVersion: manifest.formatVersion,
-      sourceCreatedAt: manifest.createdAt,
-    });
-    verificationDatabase.close();
+    try {
+      verificationDatabase.materializedTopology();
+      verificationDatabase.db.prepare('DELETE FROM sessions').run();
+      verificationDatabase.audit({ id: null, username: 'restore-cli' }, 'backup.restore', path.basename(options.archivePath), 'success', {
+        formatVersion: manifest.formatVersion,
+        sourceCreatedAt: manifest.createdAt,
+      });
+    } finally {
+      verificationDatabase.close();
+    }
 
-    fs.mkdirSync(options.dataDir, { recursive: true });
-    fs.copyFileSync(extractedDatabase, path.join(options.dataDir, 'essentials-calls.sqlite3'));
-    fs.mkdirSync(options.soundsDir, { recursive: true });
-    fs.mkdirSync(options.configDir, { recursive: true });
-    copyIfExists(path.join(staging, 'sounds'), options.soundsDir);
-    copyIfExists(path.join(staging, 'generated'), options.configDir);
+    const extractedSounds = path.join(staging, 'sounds');
+    const extractedConfig = path.join(staging, 'generated');
+    fs.chmodSync(extractedDatabase, 0o600);
+    applySoundPermissions(extractedSounds, options.soundsReaderGid);
+
+    // Re-check immediately before populating the targets. Permission and key
+    // validation above therefore cannot leave a half-restored installation.
+    assertEmpty(options.dataDir, 'DATA_DIR');
+    assertEmpty(options.soundsDir, 'SOUNDS_DIR');
+    assertEmpty(options.configDir, 'CONFIG_OUT_DIR');
+    try {
+      createRestoreTarget(dataTarget, 0o700);
+      dataTarget.writtenEntries.push('essentials-calls.sqlite3');
+      fs.copyFileSync(extractedDatabase, path.join(options.dataDir, 'essentials-calls.sqlite3'));
+      fs.chmodSync(path.join(options.dataDir, 'essentials-calls.sqlite3'), 0o600);
+
+      createRestoreTarget(soundsTarget, 0o750);
+      copyRestoreEntries(extractedSounds, soundsTarget);
+      // fs.cpSync does not promise to preserve ownership across filesystems.
+      // Re-apply the validated reader group inside the rollback boundary. The
+      // target root itself stays untouched until every other target is ready.
+      applySoundPermissions(options.soundsDir, options.soundsReaderGid, false);
+
+      createRestoreTarget(configTarget);
+      copyRestoreEntries(extractedConfig, configTarget);
+
+      fs.chmodSync(options.soundsDir, 0o750);
+      if (options.soundsReaderGid !== undefined) fs.chownSync(options.soundsDir, -1, options.soundsReaderGid);
+    } catch (error) {
+      for (const target of targets.reverse()) rollBackRestoreTarget(target);
+      throw error;
+    }
     return manifest;
   } finally {
     fs.rmSync(staging, { recursive: true, force: true });

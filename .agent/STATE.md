@@ -1,85 +1,105 @@
 # Current state
 
-## Product and branch
+## Snapshot
 
-- Visible product: **Essentials+ Calls**.
-- Technical repository/npm namespace: `visual-pbx` (intentionally unchanged).
-- Default branch: `master` (intentionally unchanged).
-- Current work branch: `master`.
-- Asterisk base: Ubuntu 22.04 package, Asterisk 18.x (no major migration).
-- Scope: hardened local/synthetic proof of concept, not production telephony.
+- Product: **Essentials+ Calls**, a single-tenant callflow editor, simulator,
+  and isolated synthetic Asterisk 22 LTS technical proof of concept.
+- Canonical repository: `itmitalles-de/essentials-calls`; default branch:
+  `master`; stabilization branch: `stabilize/calls-verified-poc`.
+- Baseline: `d88e8e54e7591bedd667e072737426c840c4160d`; current locally verified
+  implementation tree: `fd4c58df2e47ad59bb78b7da2e782a251ab13aed`; Asterisk
+  runtime-content commit: `4a5bad7afe6768163e8ba6e24a17afe1b5ce8e6d`.
+- Historical npm, data, volume, browser-storage, AMI/test, Asterisk-path, and
+  branch identifiers remain only as documented compatibility identifiers.
+- The user's later authorization superseded the original Asterisk-18 boundary.
+  The runtime now builds exact Asterisk 22.10.1 with bundled PJProject 2.17 and
+  Jansson 2.15.0 from checksum-verified sources on a digest-pinned Ubuntu base.
 
-## Implemented
+## Implemented contract
 
-- SQLite WAL single-tenant store for users, sessions, login-rate state, redacted
-  immutable topology revisions, AES-256-GCM SIP secrets, deployments, and audit.
-- One-time `topology.json` migration with an unchanged pre-migration copy.
-- Bootstrap-only first admin; scrypt, HttpOnly/SameSite sessions, expiry/logout,
-  CSRF, role enforcement, rate limiting, security headers, last-admin safety.
-- Masked topology API, explicit secret changes, wrong-key/cipher-tamper checks,
-  transactional key rotation, and Asterisk 18 MD5 HA1 generation without
-  plaintext in generated config.
-- ETag/`If-Match`, HTTP 409, revision comments/summaries, retention, and
-  rollback forward as a new revision.
-- Versioned v2 JSON schema, 2 MiB import limit, v1 migration, dry-run,
-  atomic import, and redacted normal export.
-- Sound inventory validation, all-reference display, protected delete,
-  deliberate replacement, atomic WAV upload, and live synthetic proof that an
-  uploaded prompt is group-readable and emits RTP through the IVR.
-- Bounded undo/redo excluding selection/viewport, keyboard shortcuts, graph and
-  table editing, role UI, revisions, theme persistence.
-- Schedule node with IANA timezone, windows, explicit holidays, two outputs,
-  Europe/Berlin DST/midnight/weekend tests, and `GotoIfTime` generation.
-- Atomic staged deploy, generator safety scan, isolated Asterisk preflight,
-  immutable version directories, symlink activation, targeted reload, runtime
-  canary/endpoint checks, last-good rollback, and audit.
-- Long-lived AMI event connection with heartbeat, backoff, degraded state,
-  dedupe, reconnect snapshot, slow polling fallback, and authenticated
-  WebSocket push.
-- Native queues and explicit separation from ring-group approximations.
-- Checksummed CLI backup/empty restore with key kept separate and sessions
-  invalidated.
-- Topology-free product/health/readiness/capability contract.
-- GitHub Actions jobs for static checks, Compose/image build, SIPp/Asterisk,
-  Playwright, and live backup/restore.
+- Extensions, IVR, ring groups, queues, voicemail, schedules, immutable
+  revisions, graph/table editing, rollback, AMI, CDR, WebSocket status, and a
+  synthetic SIPp/Asterisk runtime.
+- Saving updates the persisted revision/dirty baseline but preserves undo/redo.
+  Reload, import, rollback, and browser restart establish a new history root.
+- Local admin/editor/viewer authorization, sessions/CSRF/rate limits, SQLite
+  WAL, encrypted SIP credentials, redacted topology/audit, HA1 generation,
+  staged atomic deployment, preflight, canary, and last-good rollback.
+- Checksummed empty-target recovery keeps the master key separate, invalidates
+  sessions, preserves sounds/config/revisions, and now rehearses wrong key B,
+  A-to-C rotation, obsolete A rejection, and C restore. Interrupted rotations
+  roll back both durable and process-local key state. Restore validates keys
+  and permissions before target writes, sets data/database modes itself, and
+  removes its writes again if normal target population fails.
+- `110`/`112` and `trunk`/`external` fail closed. There is no outside line,
+  real trunk, DID, carrier route, emergency fallback, recording,
+  transcription, or AI feature.
+- CI uses Node 24.19.0, immutable action/base-image references, short-lived
+  redacted failure artifacts, a fail-closed tracked-file secret scan, and an
+  npm plus Asterisk-source CycloneDX SBOM. PR whitespace validation compares
+  the actual base/head range; the acceptance diagnostic helper image is digest
+  pinned. Compose build outputs use explicit version tags in isolated project
+  namespaces, and CI rejects implicit or explicit `latest` tags.
+- Ubuntu and Debian package resolution is frozen to named 2026-08-20 snapshots
+  with exact direct-package versions and fail-on-any-update-error behavior.
+  Backend and SIPp runtime images contain neither npm/Yarn/Corepack nor backend
+  development dependencies. A checksum-pinned Trivy 0.74.0 scan uses local
+  images only and rejects every new, expired, or fixable HIGH/CRITICAL finding.
+- GitHub now enforces full action SHAs. Dependabot vulnerability alerts and
+  automated security fixes are enabled and currently report zero alerts; the
+  weekly npm/action/Docker update configuration becomes active only from the
+  default branch after review and merge.
 
-## Verified locally on 2026-08-13
+## Verified locally through 2026-08-20
 
-- Fresh `npm ci` and `npm audit --audit-level=moderate`: passed with zero
-  advisories after updating transitive `nanoid` from 3.3.17 to 3.3.18 for
-  GHSA-2v37-7h3g-55p8.
-- `npm run typecheck`, `npm test`, `npm run build`, both Compose model
-  validations, all Compose image builds, and `git diff --check`: passed.
-- Tests: 29 shared and 66 backend (95 total), no skips/todos.
-- Fresh Asterisk/SIPp acceptance: 24 semantic checks passed, then restart and
-  SQLite/active-deployment persistence passed. It uploads a generated 8 kHz
-  WAV, verifies directory mode 0750 and file mode 0640 with Asterisk GID 101,
-  observes `BackGround(custom/synthetic-live-ivr)`, and receives 150 RTP
-  packets during the synthetic IVR call.
-- Registration includes multiple endpoints and replacement registration.
-- Calls cover direct internal, ring group, queue, schedule open path, IVR
-  playback/timeout/valid-invalid DTMF, voicemail, AMI channel/queue/hangup, CDR,
-  WebSocket, deploy, invalid block, reload, corrupt activation rollback.
-- The fresh Playwright run did not pass: test 1 expected one Undo after saving
-  to remove `E2E Extension`, but the node remained visible at
-  `tests/e2e/app.spec.ts:145`; the remaining 7 tests did not run. An older 8/8
-  pass exists, but the current browser regression remains open.
-- Live backup/empty restore previously passed source calls, checksummed archive,
-  separate key, target restore, and post-restore callflows. It was not rerun in
-  this continuation and predates the latest migration/file-mode/AMI-input and
-  custom-WAV acceptance changes.
+- Fresh exact Node 24.19.0/npm 11.17.0 `npm ci`; moderate audit: zero
+  vulnerabilities.
+- Typecheck and production build passed. Unit suites: 30 shared, 70 backend,
+  and 5 frontend tests (105/105), no skips or TODOs.
+- Ordinary and acceptance Compose models validated. The explicit-tag policy
+  passed for three ordinary and four acceptance images; Asterisk, backend,
+  frontend, and SIPp acceptance images built from digest-pinned bases.
+- Full-stack: 28 semantic checks passed, then Asterisk/backend restart and
+  exact user/role/topology/revision/audit/active-deployment persistence passed;
+  the complete successful run took approximately 99 seconds.
+- Browser: Playwright 1.62.1, Chrome for Testing 151.0.7922.34, all 8 tests in
+  32.2 seconds (approximately 57 seconds including stack lifecycle), no
+  skips/TODOs and no unexpected console/page errors,
+  unallowlisted HTTP failures, failed requests, or unhandled browser promise
+  rejections.
+- Backup/recovery: approximately 192 seconds; fresh source/A/C volumes and image
+  namespaces; both wrong-key cases failed closed; valid A and C restores passed
+  user/role/revision/audit,
+  session invalidation, non-persisted AMI state, pre-start file modes, Asterisk
+  startup, custom WAV/IVR, 56 RTP packets, semantic routes, CDR, and WebSocket
+  checks. Unit injection also proved cleanup after a target-population error.
+- Secret scan including the lockfile, immutable action/image verification,
+  224-component npm and 6-component Asterisk CycloneDX SBOM generation,
+  worktree whitespace validation, and base-to-head PR whitespace validation
+  passed. Trivy found no HIGH/CRITICAL issue in Asterisk or frontend and no new
+  or fixable issue in any image. The pinned Debian snapshot has 15 unique
+  unfixed IDs (30 backend and 33 SIPp-image occurrences); their package-scoped
+  PoC exception expires on 2026-09-20 and is a visible production blocker.
+- GitHub Actions is externally blocked before any job step by the account's
+  failed-payment or spending-limit gate. Repeated review-head runs show five
+  zero-step failures; there is no successful final-head CI evidence yet, so PR
+  #3 remains a draft.
 
-## Evidence boundary
+## Evidence boundary and residual gates
 
-All telephone identities, credentials, prompts, and calls are synthetic. No
-trunk, DID, emergency call, carrier, physical endpoint, real-network audio,
-customer NAT/firewall, or production behavior has been verified. See
-`docs/VERIFICATION_MATRIX.md` and `docs/roadmap.md`.
+All identities, credentials, prompts, calls, and media were synthetic. No real
+provider, SIP trunk, DID, emergency call, handset, public telephone network,
+carrier NAT/audio behavior, customer, or production operation was used.
 
-## Publication state
+Open gates include code/licence rights; responsibility and revenue allocation;
+provider contract/access/DID; privacy and emergency concepts; NAT/firewall,
+TLS/SRTP, codec and endpoint tests; monitoring/support/maintenance; controlled
+Asterisk/PJProject/Jansson and package-snapshot refresh governance; removal or
+renewed review of the time-limited Debian CVE exceptions; managed secret/code
+scanning (GitHub Advanced Security is unavailable here); and explicit
+carrier/legal/production acceptance.
 
-The earlier hardening snapshot is on `master` and `origin/master` at `e0e05d0`.
-This continuation is committed locally on `master` but intentionally not pushed
-because the user requested a pause. Existing GitHub draft PR #2 is unrelated
-and must not be merged or repurposed. The exact unfinished technical work is
-recorded in `.agent/TODO.md`.
+The isolated test-DID document is a future gate plan only. It must not run
+without named approvals, one explicit ordinary test destination on a positive
+allowlist, provider credentials outside Git, and an approved maintenance
+window. The review branch must not be merged automatically.

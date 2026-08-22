@@ -1,12 +1,29 @@
 # Decisions
 
-## Product name without administrative repository migration
+## Repository rename with compatibility boundaries
 
-**Decision:** User-visible branding is Essentials+ Calls; repository/package
-namespace, default branch, and Asterisk 18 base remain unchanged.
+**Decision:** The canonical repository is `itmitalles-de/essentials-calls` and
+the product is Essentials+ Calls. Historical npm/package, persistent path,
+volume, browser-storage, AMI/test, and Asterisk identifiers remain compatible;
+the default branch stays `master`.
 
-**Reason:** The assignment explicitly separates product naming from technical
-administration and major-version migration.
+**Reason:** Public identity must match the repository rename without risking an
+unrelated workspace/data migration or orphaning installed state. The exact
+boundary is documented in `docs/COMPATIBILITY_IDENTIFIERS.md`.
+
+## Save is not an undo boundary
+
+**Decision:** Saving creates an immutable server revision and updates the local
+dirty-state baseline, but does not clear the editor's undo/redo stacks.
+
+**Reason:** Save persists current work; it is not a new editing session. Common
+editor semantics allow undoing the last domain change after save. Undo can make
+the editor dirty relative to the saved revision and redo can restore it.
+
+**Consequence:** Loading, import, rollback, and browser restart establish a new
+history root. Unit and eight-case Playwright coverage exercise node creation,
+multiple pre/post-save changes, undo/redo, graph/table switching, reload,
+revision, rollback, and a fresh browser-context persisted state.
 
 ## SQLite WAL single-tenant persistence
 
@@ -29,18 +46,23 @@ sessions, CSRF, and viewer/editor/admin authorization on every API route.
 **Reason:** This is the smallest self-contained single-tenant trust boundary.
 OIDC/Office SSO is explicitly deferred.
 
-## AEAD source secrets and Asterisk 18 HA1 derivatives
+## AEAD source secrets and Asterisk 22 digest derivatives
 
 **Decision:** Encrypt SIP passwords with AES-256-GCM in SQLite and materialize
-them only transiently. Generate Asterisk 18 `md5_cred` HA1 for the fixed
-`asterisk` realm instead of plaintext config.
+them only transiently. Generate Asterisk 22 `auth_type=digest` with a
+pre-computed `password_digest` for the fixed `asterisk` realm instead of
+plaintext config. Keep the algorithm at MD5 only for the pinned synthetic SIPp
+3.6.1 client and declare it explicitly with `supported_algorithms_uas=MD5`.
 
-**Reason:** Asterisk 18 supports HA1 but predates newer `password_digest`.
-This meets the no-plaintext persistent-storage boundary without changing the
-Asterisk major.
+**Reason:** This uses the non-deprecated Asterisk 22 configuration form and
+meets the no-plaintext persistent-storage boundary. SIPp 3.6.1 predates
+SHA-256 digest support; Asterisk 22 with bundled PJProject 2.17 supports
+SHA-256 and SHA-512-256, so MD5 is not a runtime limitation.
 
 **Consequence:** Keys are supplied separately and backed up separately. Strong
-SIP passwords remain mandatory because HA1 can be guessed offline.
+SIP passwords remain mandatory because HA1 can be guessed offline. Moving the
+synthetic client and generated digest contract to SHA-256 is a separate
+hardening change that requires full registration/call requalification.
 
 ## Optimistic concurrency and immutable history
 
@@ -90,6 +112,17 @@ can cover the complete required contract.
 **Reason:** Partial mock behavior would encourage false carrier and emergency
 claims.
 
+## Emergency and pilot routing fail closed
+
+**Decision:** Reject `110` and `112` as extension numbers, keep
+`trunk`/`external` disabled, and generate no outside line or fallback. Any
+future isolated pilot must use a positive allowlist containing only the approved
+ordinary test destination; a blacklist alone is not sufficient.
+
+**Reason:** “Not supported” must be a technical boundary, not merely a warning.
+The current repository has no authority or evidence for emergency or carrier
+routing.
+
 ## Separate administrative backup
 
 **Decision:** Normal topology export is redacted; full backup is a CLI archive
@@ -98,3 +131,82 @@ but never the master key.
 
 **Reason:** Sharing a topology and recovering a system have different
 privileges and threat models.
+
+## Master-key recovery is an A/B/C fail-closed rehearsal
+
+**Decision:** Recovery acceptance must reject unrelated key B, restore an A
+archive only with A, atomically rotate all credentials to C, reject old A for a
+C archive, and restore C only with C. The key is never in the archive or audit.
+
+**Reason:** A green file-copy test does not prove encrypted-state recovery.
+Transactional interruption injection must leave every row consistently
+repairable with the former key rather than commit a mixed-key state.
+
+## Empty-target restore validates first and rolls back handled write failures
+
+**Decision:** Verify archive integrity, credential decryption, session
+invalidation, and requested sound ownership in staging before target writes.
+Set data/database permissions in the restore operation itself. If ordinary
+target population then fails, remove only restore-owned entries and preserve a
+pre-existing empty target root and its original mode.
+
+**Reason:** Backend startup must not mask an incorrectly restored mode, and a
+reported restore failure must not leave an installation that violates the
+empty-target retry contract. This is fail-clean handling for caught filesystem
+errors, not a claim of crash-atomic multi-volume storage.
+
+## Asterisk 22 LTS supersedes the Asterisk 18 pin
+
+**Decision:** The user's later explicit authorization supersedes the original
+Asterisk-18 boundary. Build exact Asterisk 22.10.1 from checksum-verified source
+with bundled PJProject 2.17 and Jansson 2.15.0, `BUILD_NATIVE` disabled,
+checksum-pinned core/MOH assets, fixed compatibility GID 101, and the existing
+FHS/data paths.
+
+**Reason:** Asterisk 18 is upstream-EOL. Asterisk 22 is the current LTS branch;
+pinning an exact stable release removes the former EOL conflict without using a
+mutable distribution Asterisk package.
+
+**Consequence:** Every runtime evidence class must be rerun on the new image.
+LTS support removes only the old runtime-EOL blocker and does not establish
+carrier, DID, NAT/audio, emergency, legal, operational, or production
+acceptance. No further major upgrade is authorized.
+
+## Package inputs are snapshot-pinned and runtime images are minimized
+
+**Decision:** Keep every base image on an immutable digest, resolve Asterisk
+Ubuntu packages through snapshot `20260820T120000Z`, and resolve Debian archive
+and security packages through imports `20260820T142943Z` and
+`20260820T142410Z`. Pin every direct apt package version and make any apt update
+error fatal. Because the minimal Jammy base has no CA bundle, bootstrap only
+the exact CA/openssl versions from Ubuntu's signed live archive before switching
+to the snapshot. Remove npm, npx, Yarn, Corepack, and backend development
+dependencies from Node runtime images.
+
+**Reason:** Digest-pinned bases alone do not make later package installation
+reproducible, and build tooling in a runtime image creates avoidable attack
+surface. Exact versions plus immutable snapshots either reproduce the selected
+closure or fail closed.
+
+**Consequence:** Snapshots also freeze vulnerabilities and have finite external
+retention. Every snapshot refresh is a reviewed runtime change requiring image,
+SIPp, browser, and recovery requalification; a long-term pilot needs an owned
+signed mirror rather than indefinite reliance on public history.
+
+## Container CVEs use a narrow, expiring exception instead of silent ignores
+
+**Decision:** Download Trivy 0.74.0 from its exact release URL, verify its
+SHA-256 before execution, and scan only the four already-built local images.
+Any new or fixable HIGH/CRITICAL finding fails. The 15 currently unfixed Debian
+IDs are allowed only for the named backend/SIPp packages through
+2026-09-20; expiry, a newly published fix, or a stale exception also fails.
+
+**Reason:** A blanket `ignore-unfixed` would hide changes, while pretending the
+upstream Debian findings do not exist would turn a green gate into a production
+claim. A package-scoped deadline keeps the PoC testable and the residual risk
+reviewable.
+
+**Consequence:** This is a time-limited technical-PoC acceptance, not a security
+or production approval. GitHub enforces full action SHAs and Dependabot alerts
+and automated fixes are enabled, but managed secret/code scanning remains
+unavailable without Advanced Security and is still an external gate.

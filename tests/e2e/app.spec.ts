@@ -1,9 +1,10 @@
 import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { APIRequestContext, Page, expect, request, test } from '@playwright/test';
+import { APIRequestContext, Page, Response, expect, request, test } from '@playwright/test';
 
 const repositoryRoot = path.resolve(process.cwd());
+const browserBase = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18180';
 const apiBase = `${(process.env.E2E_API_URL ?? 'http://127.0.0.1:14100/api').replace(/\/$/, '')}/`;
 const admin = {
   username: process.env.E2E_ADMIN_USERNAME ?? 'synthetic-e2e-admin',
@@ -15,6 +16,42 @@ const editor = { username: 'synthetic-editor', password: process.env.E2E_EDITOR_
 interface ApiSession {
   context: APIRequestContext;
   csrfToken: string;
+}
+
+const browserFailures = new WeakMap<Page, string[]>();
+
+function expectedNegativeResponse(response: Response): boolean {
+  const { pathname } = new URL(response.url());
+  const method = response.request().method();
+  const status = response.status();
+  return (
+    (method === 'GET' && pathname === '/api/auth/session' && status === 401) ||
+    (method === 'DELETE' && pathname === '/api/sounds/e2e-prompt' && status === 409) ||
+    (method === 'PUT' && pathname === '/api/topology' && status === 409)
+  );
+}
+
+function monitorBrowserFailures(page: Page): string[] {
+  const failures: string[] = [];
+  browserFailures.set(page, failures);
+  page.on('console', (entry) => {
+    // Chromium duplicates HTTP failures as generic console messages. Response
+    // and request-failure listeners below validate those with an exact
+    // method/path/status allowlist; every other console error remains fatal.
+    if (entry.type() === 'error' && !entry.text().startsWith('Failed to load resource:')) {
+      failures.push(`console.error: ${entry.text()}`);
+    }
+  });
+  page.on('response', (response) => {
+    if (response.status() >= 400 && !expectedNegativeResponse(response)) {
+      failures.push(`http ${response.status()}: ${response.request().method()} ${response.url()}`);
+    }
+  });
+  page.on('requestfailed', (request) => {
+    failures.push(`requestfailed: ${request.method()} ${request.url()} (${request.failure()?.errorText ?? 'unknown error'})`);
+  });
+  page.on('pageerror', (error) => failures.push(`pageerror: ${error.message}`));
+  return failures;
 }
 
 async function apiLogin(username: string, password: string): Promise<ApiSession> {
@@ -35,7 +72,15 @@ async function loginPage(page: Page, username = admin.username, password = admin
   await page.getByLabel('Passwort').fill(password);
   await page.getByRole('button', { name: 'Anmelden' }).click();
   await expect(page.getByText(`Angemeldet als ${username}`, { exact: false })).toBeVisible();
+  await expect(page.getByRole('note')).toContainText('keine produktive PBX');
   await expect(page.getByLabel('Callflow-Graph')).toBeVisible();
+}
+
+async function selectGraphNode(page: Page, label: string): Promise<void> {
+  // Newly placed nodes may sit beneath React Flow's minimap. Dispatching the
+  // semantic node event avoids making editor correctness depend on random
+  // placement coordinates while still exercising the application's handler.
+  await page.locator('.react-flow__node').filter({ hasText: label }).dispatchEvent('click');
 }
 
 function pcmWav(): Buffer {
@@ -75,6 +120,14 @@ function compose(...args: string[]): void {
 }
 
 test.describe.serial('Essentials+ Calls browser acceptance', () => {
+  test.beforeEach(async ({ page }) => {
+    monitorBrowserFailures(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    expect(browserFailures.get(page) ?? [], 'browser console errors or unhandled page exceptions').toEqual([]);
+  });
+
   test.beforeAll(async () => {
     const session = await apiLogin(admin.username, admin.password);
     try {
@@ -98,7 +151,7 @@ test.describe.serial('Essentials+ Calls browser acceptance', () => {
     }
   });
 
-  test('login, graph/table editing, edges and bounded undo/redo are semantic', async ({ page }) => {
+  test('login, graph/table editing, edges and bounded undo/redo are semantic', async ({ page, browser }) => {
     await loginPage(page);
     await expect(page.getByRole('button', { name: 'Rückgängig' })).toBeDisabled();
 
@@ -110,17 +163,61 @@ test.describe.serial('Essentials+ Calls browser acceptance', () => {
     const initialNodeCount = await nodes.count();
     await page.getByRole('button', { name: '+ Extension', exact: true }).click();
     await expect(nodes).toHaveCount(initialNodeCount + 1);
-    await page.getByLabel('Label', { exact: true }).fill('E2E Extension');
-    await page.getByText('Essentials+ Calls', { exact: true }).click();
-    await page.keyboard.press('Control+z');
+
+    // Saving is a persisted baseline, not an undo boundary: when creation is
+    // the only edit, one Undo removes the node and Redo returns to the saved
+    // revision state.
+    await page.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.getByText('Als neue Revision gespeichert.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Rückgängig' })).toBeEnabled();
+    await page.getByRole('button', { name: 'Rückgängig' }).click();
+    await expect(page.getByText('Neue Extension', { exact: true })).toHaveCount(0);
+    await expect(page.locator('.revision-badge')).toContainText('ungespeichert');
+    await page.getByRole('button', { name: 'Wiederholen' }).click();
     await expect(page.getByText('Neue Extension', { exact: true })).toBeVisible();
-    await page.keyboard.press('Control+Shift+z');
-    await expect(page.getByText('E2E Extension', { exact: true })).toBeVisible();
+    await expect(page.locator('.revision-badge')).not.toContainText('ungespeichert');
+
+    // Multiple property edits before the next save remain individual history
+    // entries instead of being collapsed into the original node creation.
+    await selectGraphNode(page, 'Neue Extension');
+    await page.getByLabel('Label', { exact: true }).fill('E2E Extension');
     await page.getByLabel('Nummer', { exact: true }).fill('199');
     await page.getByLabel('SIP User', { exact: true }).fill('199');
 
     await page.getByRole('button', { name: 'Tabelle' }).click();
     await expect(page.getByRole('table', { name: 'Nodes' }).locator('tbody tr').last().locator('input').first()).toHaveValue('E2E Extension');
+    await page.getByRole('button', { name: 'Graph' }).click();
+    await selectGraphNode(page, 'E2E Extension');
+    await page.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.getByText('Als neue Revision gespeichert.', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Rückgängig' }).click();
+    await expect(page.getByText('E2E Extension', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Nummer', { exact: true })).toHaveValue('199');
+    await expect(page.getByLabel('SIP User', { exact: true })).toHaveValue('100');
+    await expect(page.locator('.revision-badge')).toContainText('ungespeichert');
+    await page.getByRole('button', { name: 'Wiederholen' }).click();
+    await expect(page.getByLabel('SIP User', { exact: true })).toHaveValue('199');
+    await expect(page.locator('.revision-badge')).not.toContainText('ungespeichert');
+
+    // Edits after save use the same history and dirty-state contract.
+    await page.getByLabel('Label', { exact: true }).fill('E2E Extension draft');
+    await expect(page.locator('.revision-badge')).toContainText('ungespeichert');
+    await page.getByRole('button', { name: 'Rückgängig' }).click();
+    await expect(page.getByText('E2E Extension', { exact: true })).toBeVisible();
+    await expect(page.locator('.revision-badge')).not.toContainText('ungespeichert');
+    await page.getByRole('button', { name: 'Wiederholen' }).click();
+    await expect(page.getByText('E2E Extension draft', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Rückgängig' }).click();
+
+    await page.reload();
+    await expect(page.getByText('E2E Extension', { exact: true })).toBeVisible();
+    await selectGraphNode(page, 'E2E Extension');
+    await expect(page.getByLabel('SIP User', { exact: true })).toHaveValue('199');
+    await expect(page.getByRole('button', { name: 'Rückgängig' })).toBeDisabled();
+
+    // Graph/table transitions and edge operations use the same topology and do
+    // not compromise node history.
+    await page.getByRole('button', { name: 'Tabelle' }).click();
     const edgeRows = page.getByRole('table', { name: 'Edges' }).locator('tbody tr');
     const initialEdgeCount = await edgeRows.count();
     await page.getByRole('button', { name: '+ Edge', exact: true }).click();
@@ -129,7 +226,7 @@ test.describe.serial('Essentials+ Calls browser acceptance', () => {
     await expect(edgeRows).toHaveCount(initialEdgeCount);
 
     await page.getByRole('button', { name: 'Graph' }).click();
-    await page.getByText('E2E Extension', { exact: true }).click();
+    await selectGraphNode(page, 'E2E Extension');
     await page.getByRole('button', { name: 'Node löschen' }).click();
     await expect(page.getByText('E2E Extension', { exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Rückgängig' }).click();
@@ -137,20 +234,32 @@ test.describe.serial('Essentials+ Calls browser acceptance', () => {
     await page.getByRole('button', { name: 'Wiederholen' }).click();
     await expect(page.getByText('E2E Extension', { exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Rückgängig' }).click();
-    await page.getByRole('button', { name: 'Speichern' }).click();
-    await expect(page.getByText('Als neue Revision gespeichert.', { exact: true })).toBeVisible();
-    await expect(page.locator('.revision-badge')).not.toContainText('ungespeichert');
-    await expect(page.getByRole('button', { name: 'Rückgängig' })).toBeEnabled();
-    await page.getByRole('button', { name: 'Rückgängig' }).click();
-    await expect(page.getByText('E2E Extension', { exact: true })).toHaveCount(0);
-    await expect(page.locator('.revision-badge')).toContainText('ungespeichert');
+
+    // A reload is an explicit history reset while the saved revision remains.
     await page.reload();
     await expect(page.getByText('E2E Extension', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Rückgängig' })).toBeDisabled();
-    await page.getByText('E2E Extension', { exact: true }).click();
+    await selectGraphNode(page, 'E2E Extension');
     await page.getByLabel('Neues SIP-Secret (Admin)').fill('SyntheticE2eExtension-199!');
     await page.getByRole('button', { name: 'Secret ersetzen' }).click();
     await expect(page.getByText('Secret geändert. Der alte Wert wurde nicht zurückgegeben.', { exact: true })).toBeVisible();
+
+    // Re-authentication in a fresh browser context proves server persistence,
+    // not merely React state surviving a page reload.
+    const restartedContext = await browser.newContext({ baseURL: browserBase });
+    const restartedPage = await restartedContext.newPage();
+    const restartedFailures = monitorBrowserFailures(restartedPage);
+    try {
+      await loginPage(restartedPage);
+      await expect(restartedPage.getByText('E2E Extension', { exact: true })).toBeVisible();
+      await selectGraphNode(restartedPage, 'E2E Extension');
+      await expect(restartedPage.getByLabel('Nummer', { exact: true })).toHaveValue('199');
+      await expect(restartedPage.getByLabel('SIP User', { exact: true })).toHaveValue('199');
+      await expect(restartedPage.getByRole('button', { name: 'Rückgängig' })).toBeDisabled();
+      expect(restartedFailures, 'fresh browser console errors or unhandled page exceptions').toEqual([]);
+    } finally {
+      await restartedContext.close();
+    }
   });
 
   test('live validation blocks an invalid deploy and a valid revision deploys', async ({ page }) => {
